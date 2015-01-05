@@ -12,6 +12,7 @@ import subprocess
 def initial_sequence_with_gc_caps(secstruct, sequence_constraints, no_gccap): 
     """
     test2
+    test
     """
 	n = len(secstruct)
 	pairmap = eterna_utils.get_pairmap_from_secstruct(secstruct)
