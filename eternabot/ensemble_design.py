@@ -167,8 +167,7 @@ def get_sequence_string(arr):
 def inverse_fold(secstruct, start_sequence, constraints, scoring_func, score_cutoff):
     """
     args:
-    secstruct contains dict where keys are lists of seq numbers and values are
-        secondary structures
+    secstruct contains secondary structure
     start_sequence is the current sequence
     constraints contain constraints on sequence positions
     scoring_func is a function for scoring sequences
@@ -372,8 +371,7 @@ def inverse_fold(secstruct, start_sequence, constraints, scoring_func, score_cut
 def inverse_fold_whole(secstruct, constraints, score_func, score_cutoff, conventional):
     """
     args:
-    secstruct contains dict where keys are space-delimited strings of seq
-        numbers and values are secondary structures
+    secstruct contains secondary structure
     constraints contain constraints on sequence positions
     score_func is a function for scoring sequences, takes in dict of designs
         returns scores
@@ -423,8 +421,7 @@ def inverse_fold_recursive(root,secstruct,sequence_array,constraints,score_func,
     """
     args:
     root is the root element
-    secstruct contains dict where keys are space-delimited strings of seq
-        numbers and values are secondary structures
+    secstruct contains secondary structure
     sequence_array contains the current sequence as an array
     constraints contain constraints on sequence positions
     score_func is a function for scoring sequences
