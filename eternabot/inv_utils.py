@@ -16,10 +16,23 @@ BASES = ['A','U','G','C']
 #fold a sequence
 #@param seq:sequence 
 #@return: [parenthesis notation, energy]
+
 def fold(seq):
-    p = Popen(['RNAfold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    """
+    folds sequence using Vienna
+
+    args:
+    seq is the sequence string
+
+    returns:
+    secondary structure
+    """
+    # run ViennaRNA
+    p = Popen(['./RNAfold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     pair= p.communicate(input=''.join(seq))[0]
     p.wait()
+
+    # split result by whitespace
     toks = re.split('\s+| \(?\s?',pair)
     ret= []
     ret.append(toks[1])
@@ -27,9 +40,21 @@ def fold(seq):
     return ret
 
 def cofold(seq):
-    p = Popen(['RNAcofold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    """
+    cofolds sequence using Vienna
+
+    args:
+    seq is the sequence string
+
+    returns:
+    secondary structure
+    """
+    # run ViennaRNA
+    p = Popen(['./RNAcofold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     pair= p.communicate(input=''.join(seq))[0]
     p.wait()
+
+    # split result by whitespace
     toks = re.split('\s+| \(?\s?',pair)
     ret= []
     ret.append(toks[1])
