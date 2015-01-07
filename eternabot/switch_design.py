@@ -61,7 +61,7 @@ class OligoPuzzle:
         self.target_pairmap['oligo']  = eterna_utils.get_pairmap_from_secstruct(self.target['oligo'][0])
         self.target_pairmap['no_oligo']  = eterna_utils.get_pairmap_from_secstruct(self.target['no_oligo'][0])
 
-        self.update_sequence(self.sequence)
+        self.update_sequence(*self.get_sequence_info(self.sequence))
         
         # maintain best
         self.best_sequence = self.sequence
@@ -110,18 +110,19 @@ class OligoPuzzle:
         native_pairmap['no_oligo'] = eterna_utils.get_pairmap_from_secstruct(native['no_oligo'])
         #design = eterna_utils.get_design_from_sequence(sequence,native['no_oligo'])
         design_score = self.get_design_score(native)#, design)
-        return [native, native_pairmap, design_score]#, design]
+        return [sequence, native, native_pairmap, design_score]#, design]
 
-    def reinitialize_sequence(self):
+    def reset_sequence(self):
         sequence = self.constraints.replace("N", "A")
-        self.update_sequence(sequence)
+        self.update_sequence(*self.get_sequence_info(sequence))
+        self.update_best()
 
-    def update_sequence(self, sequence):
+    def update_sequence(self, sequence, native, native_pairmap, score):
         """
         updates current sequence and related information
         """
         self.sequence = sequence
-        [native, native_pairmap, score] = self.get_sequence_info(sequence)
+        #[native, native_pairmap, score] = self.get_sequence_info(sequence)
         self.native = native
         self.native_pairmap = native_pairmap
         #self.design = design
@@ -188,11 +189,11 @@ class OligoPuzzle:
             mut_array[rindex] = ensemble_design.get_random_base()
             
             mut_sequence = ensemble_design.get_sequence_string(mut_array)
-            [native, native_pairmap, score] = self.get_sequence_info(mut_sequence)
+            [mut_sequence, native, native_pairmap, score] = self.get_sequence_info(mut_sequence)
             
             # if distance or score is better for mutant, update the current sequence
             if(score > self.design_score or random.random() < score/self.design_score):
-                self.update_sequence(mut_sequence)
+                self.update_sequence(mut_sequence, native, native_pairmap, score)
             
                 # if distance or score is better for mutant than best, update the best sequence    
                 if(score > self.best_design_score):
@@ -215,11 +216,12 @@ class test_functions(unittest.TestCase):
 
     def test_check_secstructs(self):
         sequence = "ACAAGCUUUUUGCUCGUCUUAUACAUGGGUAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA"
-        self.puzzle.update_sequence(sequence)
+        self.puzzle.update_sequence(*self.puzzle.get_sequence_info(sequence))
         self.assertTrue(self.puzzle.check_current_secstructs())
 
     def test_optimize_sequence(self):
-        self.puzzle.update_sequence("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA")
+        sequence = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA"
+        self.puzzle.update_sequence(*self.puzzle.get_sequence_info(sequence))
         self.puzzle.optimize_sequence(77)
         print self.puzzle.get_solution()
         self.assertTrue(self.puzzle.check_current_secstructs())
@@ -235,14 +237,22 @@ def main():
     ensemble = ensemble_utils.Ensemble("conventional", strategy_names, None)
     puzzle = OligoPuzzle(constraints, oligo_sequence, secstruct, ensemble.score)
 
-    fout = open('switch_output.txt', 'w')
-    for i in xrange(100):
-        puzzle.reinitialize_sequence()
+    solutions = []
+    i = 0
+    while i < 100:
+        puzzle.reset_sequence()
         puzzle.optimize_sequence(77)
         assert puzzle.check_current_secstructs()
-        fout.write("%s\n" % puzzle.get_solution()[0])
+        sequence = puzzle.get_solution()[0]
+        print sequence
+        if sequence not in solutions:
+            solutions.append(sequence)
+            i += 1
         print "%s sequence calculated" % i
-    fout.close()
+
+    with open('switch_output.txt', 'w') as fout:
+        for sol in solutions:
+            fout.write("%s\n" % sol)
 
 if __name__ == "__main__":
     #unittest.main()
