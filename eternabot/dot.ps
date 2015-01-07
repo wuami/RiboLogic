@@ -1,13 +1,13 @@
 %!PS-Adobe-3.0 EPSF-3.0
 %%Title: RNA Dot Plot
-%%Creator: PS_dot.c,v 1.38 2007/02/02 15:18:13 ivo Exp $, ViennaRNA-1.8.5
-%%CreationDate: Thu Dec  4 19:35:13 2014
+%%Creator: PS_dot.c,v 1.38 2007/02/02 15:18:13 ivo Exp $, ViennaRNA-2.1.8
+%%CreationDate: Wed Jan  7 14:14:06 2015
 %%BoundingBox: 66 211 518 662
 %%DocumentFonts: Helvetica
 %%Pages: 1
 %%EndComments
 
-%Options: 
+%Options: -d2 
 % 
 %This file contains the square roots of the base pair probabilities in the form
 % i  j  sqrt(p(i,j)) ubox
@@ -89,7 +89,7 @@ DPdict begin
 270 665 moveto /Helvetica findfont 14 scalefont setfont (dot.ps) show
 
 /sequence { (\
-GUUCAAAGAAC\
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA\
 ) } def
 /len { sequence length } bind def
 
@@ -103,19 +103,72 @@ drawseq
 0.04 setlinewidth
 0 len moveto len 0 lineto stroke 
 
-drawgrid
+/min { 2 copy gt { exch } if pop } bind def
+
+/utri{ % i j prob utri
+  gsave
+  1 min 2 div
+  0.85 mul 0.15 add 0.95  0.33
+  3 1 roll % prepare hsb color
+  sethsbcolor
+  % now produce the coordinates for lines
+  exch 1 sub dup len exch sub dup 4 -1 roll dup 3 1 roll dup len exch sub
+  moveto lineto lineto closepath fill
+  grestore
+} bind def
+
 %data starts here
-1 11 0.668626985 ubox
-2 6 0.007114791 ubox
-2 7 0.014769688 ubox
-2 8 0.022124458 ubox
-2 9 0.044956199 ubox
-2 10 0.680828846 ubox
-3 7 0.013678613 ubox
-3 8 0.042608788 ubox
-3 9 0.684093075 ubox
-3 10 0.013176453 ubox
-4 8 0.633575051 ubox
+
+%start of quadruplex data
+
+%draw the grid
+drawgrid
+
+%start of base pair probability data
+58 75 0.003389912 ubox
+36 58 0.005513738 ubox
+37 58 0.007628910 ubox
+38 58 0.010632528 ubox
+39 58 0.041831144 ubox
+40 58 0.912175374 ubox
+41 57 0.999510317 ubox
+42 56 0.999407265 ubox
+42 58 0.005433963 ubox
+43 51 0.003936773 ubox
+43 55 0.999367096 ubox
+43 57 0.005754498 ubox
+44 50 0.004419222 ubox
+44 53 0.011257522 ubox
+44 54 0.999097984 ubox
+44 56 0.005776063 ubox
+45 49 0.004014643 ubox
+46 50 0.007449120 ubox
+46 52 0.224456893 ubox
+46 53 0.971109593 ubox
+46 54 0.027942501 ubox
+47 52 0.965213967 ubox
+47 53 0.030883261 ubox
+58 62 0.005515738 ubox
+58 63 0.010555191 ubox
+58 64 0.009732697 ubox
+58 65 0.012414568 ubox
+58 66 0.007630177 ubox
+58 67 0.011447185 ubox
+58 68 0.005515731 ubox
+58 69 0.005085928 ubox
+58 70 0.004689616 ubox
+58 71 0.004324186 ubox
+58 72 0.003987232 ubox
+58 73 0.003676529 ubox
+58 74 0.003676496 ubox
+35 58 0.003982664 ubox
+40 58 0.9500000 lbox
+41 57 0.9500000 lbox
+42 56 0.9500000 lbox
+43 55 0.9500000 lbox
+44 54 0.9500000 lbox
+46 53 0.9500000 lbox
+47 52 0.9500000 lbox
 showpage
 end
 %%EOF

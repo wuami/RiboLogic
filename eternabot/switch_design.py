@@ -1,7 +1,11 @@
 import inv_utils
 import eterna_utils
+import ensemble_design
+import ensemble_utils
 import unittest
 import sys
+import random
+import math
 
 def bp_distance_with_constraint(secstruct1, secstruct2, constraint):
     """
@@ -38,231 +42,210 @@ def bp_distance_with_constraint(secstruct1, secstruct2, constraint):
     
     return dist
 
-def check_secstructs(sequence, target, oligo_sequence):
-    """
-    args:
-    sequence is the current sequence of the RNA
-    target is dictionary with target secondary structures and constraint string
-    oligo_sequence is the sequence of the oligo to be tested
+class OligoPuzzle:
 
-    return:
-    boolean indicating whether the RNA folds to the targetted structure
-    with and without the oligo
-    """
-    l = len(sequence)
-    secstruct = {}
-    secstruct['oligo'] = inv_utils.cofold('&'.join([sequence, oligo_sequence]))[0][:l]
-    secstruct['no_oligo'] = inv_utils.fold(sequence)[0]
-    if bp_distance_with_constraint(secstruct['oligo'], target['oligo'][0], target['oligo'][1]) == 0 and \
-        bp_distance_with_constraint(secstruct['no_oligo'], target['no_oligo'][0], target['no_oligo'][1]) == 0:
-        return True
-    return False
+    def __init__(self, constraints, oligo, target, scoring_func):
+        # sequence information
+        self.sequence = constraints.replace("N", "A")
+        self.n = len(self.sequence)
+        self.constraints = constraints
+        self.oligo = oligo
 
-def optimize_sequence(secstruct, start_sequence, constraints, scoring_func, score_cutoff):
-    """
-    args:
-    secstruct contains dict where keys are lists of seq numbers and values are
-    start_sequence is the current sequence
-    constraints contain constraints on sequence positions
-    scoring_func is a function for scoring sequences
-    score_cutoff is the cutoff score to stop the search
-    
-    return:
-    best sequence, bp distance, final design 
-    """
+        self.scoring_func = scoring_func
+        self.score_weight = 0
+        self.T = 100
 
-    bases = "GAUC"
-    pairs = ["GC", "CG", "AU", "UA"]
+        # target information
+        self.target = target
+        self.target_pairmap = {}
+        self.target_pairmap['oligo']  = eterna_utils.get_pairmap_from_secstruct(self.target['oligo'][0])
+        self.target_pairmap['no_oligo']  = eterna_utils.get_pairmap_from_secstruct(self.target['no_oligo'][0])
 
-    target_pairmap = eterna_utils.get_pairmap_from_secstruct(secstruct)
-    n = len(start_sequence)
-
-    # get indices for stacks and loops
-    stack_indices = []
-    loop_indices = []
-    for ii in range(0,len(target_pairmap)):
-        if target_pairmap[ii] > ii and constraints[ii] == "N":
-            stack_indices.append(ii)
-        elif target_pairmap[ii] < 0 and constraints[ii] == "N":
-            if(ii > 0 and target_pairmap[ii-1] >= 0):
-                loop_indices.append(ii)
-            elif(ii < len(target_pairmap)-1 and target_pairmap[ii+1] >= 0):
-                loop_indices.append(ii)
-    
-    # get information about current sequence    
-    sequence = start_sequence
-    native = inv_utils.fold(sequence)[0]
-    bp_distance = eterna_utils.bp_distance(secstruct,native)
-    native_pairmap = eterna_utils.get_pairmap_from_secstruct(native)
-    design = eterna_utils.get_design_from_sequence(sequence,secstruct)
-    design_score = scoring_func(design)
-    
-    # initialize variables for iteration
-    walk_iter = 0
-    stale_move = 0
-
-    best_sequence = sequence
-    best_bp_distance = bp_distance
-    best_native = native
-    best_native_pairmap = native_pairmap
-    best_design = design
-    best_design_score = design_score
-    
-    # get indices for positions that can change
-    index_array = []
-    for ii in range(0,n):
-        if(constraints[ii] == "N"):
-            index_array.append(ii)
-    
-    # loop as long as bp distance too large or design score too small
-    while(bp_distance > 10 or design_score['finalscore'] < score_cutoff) and len(index_array) > 0:
-        #print "%d %d %f" %(walk_iter, best_bp_distance, best_design_score['finalscore'])
-        #random.shuffle(index_array)
+        self.update_sequence(self.sequence)
         
-        # iterate over nucleotides in sequence
-        moved = False
-        for rrr in range(0,len(index_array)):
-            ii = index_array[rrr]
+        # maintain best
+        self.best_sequence = self.sequence
+        self.best_native = self.native
+        self.best_native_pairmap = self.native_pairmap
+        #self.best_design = self.design
+        self.best_design_score = self.design_score
+        
+        self.index_array = self.get_unconstrained_indices()
+
+    def get_unconstrained_indices(self):
+        """
+        get indices for positions that can change
+        """
+        index_array = []
+        for ii in range(0,self.n):
+            if(self.constraints[ii] == "N"):
+                index_array.append(ii)
+        return index_array
+
+    def get_solution(self):
+        """
+        return current best as solution
+        """
+        bp_distance = {}
+        bp_distance['no_oligo'] = bp_distance_with_constraint(self.target['no_oligo'][0],self.best_native['no_oligo'],self.target['no_oligo'][1])
+        bp_distance['oligo'] = bp_distance_with_constraint(self.target['oligo'][0],self.best_native['oligo'],self.target['oligo'][1])
+        return [self.best_sequence, bp_distance, self.best_design_score]
+
+    def get_design_score(self, secstruct):#, design):
+        """
+        calculates overall design score, which is sum of bp distance component and scoring function component
+        """
+        return (self.n - self.score_secstructs(secstruct))# + self.score_weight*self.scoring_func(design)['finalscore']
+
+    def get_sequence_info(self, sequence):
+        """
+        get sequence information - native fold, bp distance, pairmap, design
+        for a particular sequence
+        """
+        native = {}
+        native['no_oligo'] = inv_utils.fold(sequence)[0]
+        native['oligo'] = inv_utils.cofold('&'.join([sequence, self.oligo]))[0][:self.n]
+        native_pairmap = {}
+        native_pairmap['oligo'] = eterna_utils.get_pairmap_from_secstruct(native['oligo'])
+        native_pairmap['no_oligo'] = eterna_utils.get_pairmap_from_secstruct(native['no_oligo'])
+        #design = eterna_utils.get_design_from_sequence(sequence,native['no_oligo'])
+        design_score = self.get_design_score(native)#, design)
+        return [native, native_pairmap, design_score]#, design]
+
+    def reinitialize_sequence(self):
+        sequence = self.constraints.replace("N", "A")
+        self.update_sequence(sequence)
+
+    def update_sequence(self, sequence):
+        """
+        updates current sequence and related information
+        """
+        self.sequence = sequence
+        [native, native_pairmap, score] = self.get_sequence_info(sequence)
+        self.native = native
+        self.native_pairmap = native_pairmap
+        #self.design = design
+        self.design_score = score
+
+    def update_best(self):
+        """
+        updates best to current sequence
+        """
+        self.best_sequence = self.sequence
+        self.best_native = self.native
+        self.best_native_pairmap = self.native_pairmap
+        #self.best_design = self.design
+        self.best_design_score = self.design_score
+
+    def score_secstructs(self, secstruct):
+        """
+        calculates sum of bp distances for with and without oligo
+
+        returns:
+        sum of bp distances with and without the oligo 
+        """
+        return bp_distance_with_constraint(secstruct['oligo'], self.target['oligo'][0], self.target['oligo'][1]) + \
+               bp_distance_with_constraint(secstruct['no_oligo'], self.target['no_oligo'][0], self.target['no_oligo'][1])
+
+    def check_secstructs(self, secstruct):
+        """
+        checks if current sequence matches target secondary structures
+    
+        return:
+        boolean indicating whether the RNA folds to the targeted structure
+        with and without the oligo
+        """
+        return self.score_secstructs(secstruct) == 0
+
+    def check_current_secstructs(self):
+        return self.score_secstructs(self.native) == 0
+
+    def optimize_sequence(self, score_cutoff):
+        """
+        monte-carlo optimization of the sequence
+
+        args:
+        score_cutoff is the score at which to stop the loop
+        """
+        bases = "GAUC"
+        pairs = ["GC", "CG", "AU", "UA"]
+    
+        # initialize variables for iteration
+        walk_iter = 0
+        stale_move = 0
+    
+        if len(self.index_array) == 0:
+            return
+    
+        # loop as long as bp distance too large or design score too small
+        while(self.design_score < score_cutoff):
+            #random.shuffle(index_array)
             
-            break_for = False
-            if(target_pairmap[ii] != native_pairmap[ii]):
-                # nonmatching nucleotides that should be unpaired
-                if(target_pairmap[ii] < 0):
-                    # try each other possible base in this position
-                    for jj in range(0,len(bases)):
-                        if sequence[ii] == bases[jj]:
-                            continue
-                        mut_array = get_sequence_array(sequence)
-                        mut_array[ii] = bases[jj]
-                        
-                        mut_sequence = get_sequence_string(mut_array)
-                        mut_native = inv_utils.fold(mut_sequence)[0]
-                        mut_bp_distance = eterna_utils.bp_distance(secstruct,mut_native)
-                        mut_design = eterna_utils.get_design_from_sequence(mut_sequence,secstruct)
-                        mut_score = scoring_func(design)
-        
-                        # if distance or score is better for mutant, update the current sequence
-                        if((mut_bp_distance < bp_distance) or mut_score['finalscore'] > design_score['finalscore']):
-                            sequence = mut_sequence
-                            native = mut_native
-                            bp_distance = mut_bp_distance
-                            native_pairmap = eterna_utils.get_pairmap_from_secstruct(native)
-                            design = mut_design
-                            design_score = mut_score
-                        
-                            # if distance or score is better for mutant than best, update the best sequence    
-                            if((mut_bp_distance < best_bp_distance or mut_bp_distance < 10 or len(secstruct) < 50) and mut_score['finalscore'] > best_design_score['finalscore']):
-                                best_sequence = mut_sequence
-                                best_bp_distance = mut_bp_distance
-                                best_native = mut_native
-                                best_native_pairmap = eterna_utils.get_pairmap_from_secstruct(mut_native)
-                                best_design = mut_design
-                                best_design_score = mut_score
-                            
-                            break_for = True
-                            break
-                # nonmatching nucleotides that should be paired
-                else:
-                    # try each other possible pair in this position
-                    current_pair = sequence[ii] + sequence[target_pairmap[ii]]
-                    for jj in range(0,len(pairs)):
-                        if current_pair == pairs[jj]:
-                            continue
-                        mut_array = get_sequence_array(sequence)
-                        mut_array[ii] = pairs[jj][0]
-                        mut_array[target_pairmap[ii]] = pairs[jj][1]
-                        
-                        mut_sequence = get_sequence_string(mut_array)
-                        mut_native = inv_utils.fold(mut_sequence)[0]
-                        mut_bp_distance = eterna_utils.bp_distance(secstruct,mut_native)
-                        mut_design = eterna_utils.get_design_from_sequence(mut_sequence,secstruct)
-                        mut_score = scoring_func(design)
-                        
-                        # if distance or score is better for mutant, update the current sequence
-                        if((mut_bp_distance < bp_distance) or mut_score['finalscore'] > design_score['finalscore']):
-                            sequence = mut_sequence
-                            bp_distance = mut_bp_distance
-                            native = mut_native
-                            native_pairmap = eterna_utils.get_pairmap_from_secstruct(native)
-                            design = mut_design
-                            design_score = mut_score
-                            
-                            # if distance or score is better for mutant than best, update best
-                            if((mut_bp_distance < best_bp_distance or mut_bp_distance < 10 or len(secstruct) < 50) and mut_score['finalscore'] > best_design_score['finalscore']):
-                                best_sequence = mut_sequence
-                                best_bp_distance = mut_bp_distance
-                                best_native = mut_native
-                                best_native_pairmap = eterna_utils.get_pairmap_from_secstruct(mut_native)
-                                best_design = mut_design
-                                best_design_score = mut_score
-                            
-                            break_for = True
-                            break
-            # if the sequence has updated, break loop through nucleotides   
-            if(break_for):
-                moved = True
-                break
-        
-        # if sequence hasn't been updated, randomize sequence
-        if(moved == False):
-
-            stale_move += 1
-            
-            if(stale_move > 10):
-                return [best_sequence, best_bp_distance, best_design_score['finalscore'], best_design_score]
-            
-            rand = random.random()
-        
-            mut_array = get_sequence_array(sequence)    
-            if(rand < 0.5 and len(stack_indices) > 0):              
-                rindex = stack_indices[int(random.random() * len(stack_indices)) % len(stack_indices)]
-                if(target_pairmap[rindex] < 0):
-                    print "Something is wrong"
-                    sys.exit(0)
+            # pick random nucleotide in sequence
+            rindex = self.index_array[int(random.random() * len(self.index_array))]
                 
-                if(rand < 0.33):
-                    temp = mut_array[rindex]
-                    mut_array[rindex] = mut_array[target_pairmap[rindex]]
-                    mut_array[target_pairmap[rindex]] = temp
-                else:
-                    pair = get_random_pair()
-                    mut_array[rindex] = pair[0]
-                    mut_array[target_pairmap[rindex]] = pair[1]
-            else:
-                if (len(loop_indices) > 0):
-                    rindex = loop_indices[int(random.random() * len(loop_indices)) % len(loop_indices)]
-                    mut_array[rindex] = get_random_base()
+            mut_array = ensemble_design.get_sequence_array(self.sequence)
+            mut_array[rindex] = ensemble_design.get_random_base()
             
-            sequence = get_sequence_string(mut_array)
-            native = inv_utils.fold(sequence)[0]
-            bp_distance = eterna_utils.bp_distance(secstruct,native)
-            design = eterna_utils.get_design_from_sequence(sequence,secstruct)
-            design_score = scoring_func(design)
-        else:
-            stale_move = 0
+            mut_sequence = ensemble_design.get_sequence_string(mut_array)
+            [native, native_pairmap, score] = self.get_sequence_info(mut_sequence)
             
-        moved == False
-        walk_iter += 1
-    
-        # if it has been too many iterations, finish    
-        if(walk_iter > 400):
-            return [best_sequence, best_bp_distance, best_design_score['finalscore'], best_design_score]
-    
-    return [best_sequence, best_bp_distance, best_design_score['finalscore'], best_design_score]                
+            # if distance or score is better for mutant, update the current sequence
+            if(score > self.design_score or random.random() < score/self.design_score):
+                self.update_sequence(mut_sequence)
+            
+                # if distance or score is better for mutant than best, update the best sequence    
+                if(score > self.best_design_score):
+                    self.update_best()
+                    
+        return
 
 class test_functions(unittest.TestCase):
 
     def setUp(self):
         with open('switch_input.txt', 'r') as f:
-            self.secstruct = {}
-            self.secstruct['oligo'] = f.readline().split()
-            self.secstruct['no_oligo'] = f.readline().split()
-            self.constraints = f.readline().strip()
-            self.oligo_sequence = f.readline().strip()
+            secstruct = {}
+            secstruct['oligo'] = f.readline().split()
+            secstruct['no_oligo'] = f.readline().split()
+            constraints = f.readline().strip()
+            oligo_sequence = f.readline().strip()
+        strategy_names = ['example_gc60', 'penguian_clean_dotplot', 'berex_simplified_berex_test']
+        ensemble = ensemble_utils.Ensemble("conventional", strategy_names, None)
+        self.puzzle = OligoPuzzle(constraints, oligo_sequence, secstruct, ensemble.score)
 
     def test_check_secstructs(self):
         sequence = "ACAAGCUUUUUGCUCGUCUUAUACAUGGGUAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA"
-        self.assertTrue(check_secstructs(sequence, self.secstruct, self.oligo_sequence))
+        self.puzzle.update_sequence(sequence)
+        self.assertTrue(self.puzzle.check_current_secstructs())
+
+    def test_optimize_sequence(self):
+        self.puzzle.update_sequence("AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA")
+        self.puzzle.optimize_sequence(77)
+        print self.puzzle.get_solution()
+        self.assertTrue(self.puzzle.check_current_secstructs())
+
+def main():
+    with open('switch_input.txt', 'r') as f:
+        secstruct = {}
+        secstruct['oligo'] = f.readline().split()
+        secstruct['no_oligo'] = f.readline().split()
+        constraints = f.readline().strip()
+        oligo_sequence = f.readline().strip()
+    strategy_names = ['example_gc60', 'penguian_clean_dotplot', 'berex_simplified_berex_test']
+    ensemble = ensemble_utils.Ensemble("conventional", strategy_names, None)
+    puzzle = OligoPuzzle(constraints, oligo_sequence, secstruct, ensemble.score)
+
+    fout = open('switch_output.txt', 'w')
+    for i in xrange(100):
+        puzzle.reinitialize_sequence()
+        puzzle.optimize_sequence(77)
+        assert puzzle.check_current_secstructs()
+        fout.write("%s\n" % puzzle.get_solution()[0])
+        print "%s sequence calculated" % i
+    fout.close()
 
 if __name__ == "__main__":
-    unittest.main()
+    #unittest.main()
+    main()
+
+

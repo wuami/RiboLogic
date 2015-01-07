@@ -403,8 +403,12 @@ def fill_energy(elements,sequence,pairmap):
                             
                     type1 = vienna_parameters.pair_type(sequence[i],sequence[j])
                     type2 = vienna_parameters.pair_type(sequence[q],sequence[p])
-                    
-                    elements[ii].score_ = vienna_parameters.loop_energy(n1,n2,type1,type2, vienna_parameters.letter_to_sequence_type(sequence[i+1]), vienna_parameters.letter_to_sequence_type(sequence[j-1]), vienna_parameters.letter_to_sequence_type(sequence[p-1]), vienna_parameters.letter_to_sequence_type(sequence[q+1]), True, True) / 100.0                      
+
+                    elements[ii].score_ = vienna_parameters.loop_energy(n1,n2,type1,type2,
+                            vienna_parameters.letter_to_sequence_type(sequence[i+1]),
+                            vienna_parameters.letter_to_sequence_type(sequence[j-1]),
+                            vienna_parameters.letter_to_sequence_type(sequence[p-1]),
+                            vienna_parameters.letter_to_sequence_type(sequence[q+1]), True, True) / 100.0                      
                 else:
                     if(num_loop_groups > 0):
                         elements[ii].score_ = vienna_parameters.ml_energy(pairmap,sequence,loop_groups[0][0],False) / 100.0

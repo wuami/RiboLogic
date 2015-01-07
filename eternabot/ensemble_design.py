@@ -113,7 +113,7 @@ def get_random_base():
     random base as char
     """
     #bases = "GAUGCG"
-    bases ="GGGG"
+    bases ="GCAU"
     randn = int(math.floor(random.random() * 4) % 4)
     return bases[randn]
     
@@ -456,70 +456,74 @@ def inverse_fold_recursive(root,secstruct,sequence_array,constraints,score_func,
     for ii in range(root_start_index, root_end_index+1):
         sequence_array[ii] = res_sequence[ii-root_start_index]
 
-#JEEFIX for conventional
-strategy_names = ['merryskies_only_as_in_the_loops', 'aldo_repetition', 'dejerpha_basic_test', 'eli_blue_line', 'clollin_gs_in_place', 'quasispecies_test_by_region_boundaries', 'eli_gc_pairs_in_junction', 'eli_no_blue_nucleotides_in_hook', 'mat747_31_loops', 'merryskies_1_1_loop', 'xmbrst_clear_plot_stack_caps_and_safe_gc', 'jerryp70_jp_stratmark', 'eli_energy_limit_in_tetraloops', 'eli_double_AUPair_strategy', 'eli_green_blue_strong_middle_half', 'eli_loop_pattern_for_small_multiloops', 'eli_tetraloop_similarity', 'example_gc60', 'penguian_clean_dotplot', 'eli_twisted_basepairs', 'aldo_loops_and_stacks', 'eli_direction_of_gc_pairs_in_multiloops_neckarea', 'eli_multiloop_similarity', 'eli_green_line', 'ding_quad_energy', 'quasispecies_test_by_region_loops', 'berex_berex_loop_basic', 'eli_legal_placement_of_GUpairs', 'merryskies_1_1_loop_energy', 'ding_tetraloop_pattern', 'aldo_mismatch', 'eli_tetraloop_blues', 'eli_red_line', 'eli_wrong_direction_of_gc_pairs_in_multiloops', 'deivad_deivad_strategy', 'eli_direction_of_gc_pairs_in_multiloops', 'eli_no_blue_nucleotides_strategy', 'berex_basic_test', 'eli_numbers_of_yellow_nucleotides_pr_length_of_string', 'kkohli_test_by_kkohli']
-
-# parse inputs and specify parameters
-score_cutoff = 90
-
-secstructs  = [sys.argv[3]]
-constraints = [sys.argv[4]]
-repeat      = int(sys.argv[5])
-puzzle_titles = ["FMN Aptamer"]
-
-op = sys.argv[1]
-
-if len(secstructs) <= 50:
-    score_cutoff = 70
-elif len(secstructs) <= 80:
-    score_cutoff = 80
-
-if op == "L2":
-    weights_file_name = "no_validation_training/weights_L2.overall.txt"
-    scores_file_name = "no_validation_training/predicted_score_L2.overall.unnormalized.txt"
-elif op == "sparse":
-    weights_file_name = "no_validation_training/weights_sparse_5.overall.txt"
-    scores_file_name = "no_validation_training/predicted_score_sparse_5.overall.unnormalized.txt"
-    weights_f = open(weights_file_name,"r")
-    weights = []
-    for line in weights_f:
-        weights.append(float(line))
+def main():
+    #JEEFIX for conventional
+    strategy_names = ['merryskies_only_as_in_the_loops', 'aldo_repetition', 'dejerpha_basic_test', 'eli_blue_line', 'clollin_gs_in_place', 'quasispecies_test_by_region_boundaries', 'eli_gc_pairs_in_junction', 'eli_no_blue_nucleotides_in_hook', 'mat747_31_loops', 'merryskies_1_1_loop', 'xmbrst_clear_plot_stack_caps_and_safe_gc', 'jerryp70_jp_stratmark', 'eli_energy_limit_in_tetraloops', 'eli_double_AUPair_strategy', 'eli_green_blue_strong_middle_half', 'eli_loop_pattern_for_small_multiloops', 'eli_tetraloop_similarity', 'example_gc60', 'penguian_clean_dotplot', 'eli_twisted_basepairs', 'aldo_loops_and_stacks', 'eli_direction_of_gc_pairs_in_multiloops_neckarea', 'eli_multiloop_similarity', 'eli_green_line', 'ding_quad_energy', 'quasispecies_test_by_region_loops', 'berex_berex_loop_basic', 'eli_legal_placement_of_GUpairs', 'merryskies_1_1_loop_energy', 'ding_tetraloop_pattern', 'aldo_mismatch', 'eli_tetraloop_blues', 'eli_red_line', 'eli_wrong_direction_of_gc_pairs_in_multiloops', 'deivad_deivad_strategy', 'eli_direction_of_gc_pairs_in_multiloops', 'eli_no_blue_nucleotides_strategy', 'berex_basic_test', 'eli_numbers_of_yellow_nucleotides_pr_length_of_string', 'kkohli_test_by_kkohli']
     
-elif op == "conventional":
-    strategy_names = ['example_gc60', 'penguian_clean_dotplot', 'berex_simplified_berex_test']
-    weights_file_name = "no_validation_training/weights_conventional.overall.txt"
-    scores_file_name = "no_validation_training/predicted_score_L2.overall.unnormalized.txt"
-else:
-    print "No type specified"
-    sys.exit(0)
-
-
-# create ensemble of different strategies
-is_sparse_test = (op == "sparse")
-if(is_sparse_test):
-    ensemble = ensemble_utils.Ensemble(op, strategy_names, weights)
-else:
-    ensemble = ensemble_utils.Ensemble(op, strategy_names, None)
-
-# loop over all secondary structures
-for pp in range(0,len(secstructs)):
-    outputs = []
-    print "\n\n======%s==========\n\n" % puzzle_titles[pp]
+    # parse inputs and specify parameters
+    score_cutoff = 90
+    
+    secstructs  = [sys.argv[3]]
+    constraints = [sys.argv[4]]
+    repeat      = int(sys.argv[5])
+    puzzle_titles = ["FMN Aptamer"]
+    
+    op = sys.argv[1]
+    
+    if len(secstructs) <= 50:
+        score_cutoff = 70
+    elif len(secstructs) <= 80:
+        score_cutoff = 80
+    
+    if op == "L2":
+        weights_file_name = "no_validation_training/weights_L2.overall.txt"
+        scores_file_name = "no_validation_training/predicted_score_L2.overall.unnormalized.txt"
+    elif op == "sparse":
+        weights_file_name = "no_validation_training/weights_sparse_5.overall.txt"
+        scores_file_name = "no_validation_training/predicted_score_sparse_5.overall.unnormalized.txt"
+        weights_f = open(weights_file_name,"r")
+        weights = []
+        for line in weights_f:
+            weights.append(float(line))
         
-    # repeat folding according to argument
-    for ii in range(0,repeat):
-        outputs.append((inverse_fold_whole(secstructs[pp], constraints[pp], ensemble.score, score_cutoff, op == "conventional")))
-
-    # sort outputs based on final score of designs
-    outputs = sorted(outputs, key=lambda output: output['end'][2]['finalscore'], reverse=True)
-    outputs.append(secstructs[pp])
+    elif op == "conventional":
+        strategy_names = ['example_gc60', 'penguian_clean_dotplot', 'berex_simplified_berex_test']
+        weights_file_name = "no_validation_training/weights_conventional.overall.txt"
+        scores_file_name = "no_validation_training/predicted_score_L2.overall.unnormalized.txt"
+    else:
+        print "No type specified"
+        sys.exit(0)
     
-    init_sum = 0
-    final_sum = 0
+    
+    # create ensemble of different strategies
+    is_sparse_test = (op == "sparse")
+    if(is_sparse_test):
+        ensemble = ensemble_utils.Ensemble(op, strategy_names, weights)
+    else:
+        ensemble = ensemble_utils.Ensemble(op, strategy_names, None)
+    
+    # loop over all secondary structures
+    for pp in range(0,len(secstructs)):
+        outputs = []
+        print "\n\n======%s==========\n\n" % puzzle_titles[pp]
+            
+        # repeat folding according to argument
+        for ii in range(0,repeat):
+            outputs.append((inverse_fold_whole(secstructs[pp], constraints[pp], ensemble.score, score_cutoff, op == "conventional")))
+    
+        # sort outputs based on final score of designs
+        outputs = sorted(outputs, key=lambda output: output['end'][2]['finalscore'], reverse=True)
+        outputs.append(secstructs[pp])
+        
+        init_sum = 0
+        final_sum = 0
+    
+        # write output
+        print "printing output"
+        outputfile = open("/persistent/drupal/html/files/" + sys.argv[2] + ".txt","w+")
+        outputfile.write(simplejson.dumps(outputs))
+        outputfile.close()
+        print "printed output"
 
-    # write output
-    print "printing output"
-    outputfile = open("/persistent/drupal/html/files/" + sys.argv[2] + ".txt","w+")
-    outputfile.write(simplejson.dumps(outputs))
-    outputfile.close()
-    print "printed output"
+if __name__ == "__main__":
+    main()
