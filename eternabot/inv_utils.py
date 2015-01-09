@@ -28,29 +28,10 @@ def fold(seq):
     secondary structure
     """
     # run ViennaRNA
-    p = Popen(['./RNAfold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
-    pair= p.communicate(input=''.join(seq))[0]
-    p.wait()
-
-    # split result by whitespace
-    toks = re.split('\s+| \(?\s?',pair)
-    ret= []
-    ret.append(toks[1])
-    ret.append(toks[2][0:len(toks[2])-1])
-    return ret
-
-def cofold(seq):
-    """
-    cofolds sequence using Vienna
-
-    args:
-    seq is the sequence string
-
-    returns:
-    secondary structure
-    """
-    # run ViennaRNA
-    p = Popen(['./RNAcofold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    if '&' in seq:
+        p = Popen(['./RNAcofold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    else:
+        p = Popen(['./RNAfold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     pair= p.communicate(input=''.join(seq))[0]
     p.wait()
 

@@ -403,7 +403,7 @@ def fill_energy(elements,sequence,pairmap):
                             
                     type1 = vienna_parameters.pair_type(sequence[i],sequence[j])
                     type2 = vienna_parameters.pair_type(sequence[q],sequence[p])
-
+                    
                     elements[ii].score_ = vienna_parameters.loop_energy(n1,n2,type1,type2,
                             vienna_parameters.letter_to_sequence_type(sequence[i+1]),
                             vienna_parameters.letter_to_sequence_type(sequence[j-1]),
