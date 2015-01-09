@@ -58,10 +58,10 @@ class OligoPuzzle:
 
         # target information
         self.target = target
-        self.target_pairmap = []
-        for x in target:
-            self.target_pairmap.append(eterna_utils.get_pairmap_from_secstruct(x['secstruct']))
         self.n_targets = len(self.target)
+        self.target_pairmap = []
+        for i in range(self.n_targets):
+            self.target_pairmap.append(eterna_utils.get_pairmap_from_secstruct(target[i]['secstruct']))
 
         self.update_sequence(*self.get_sequence_info(self.sequence))
         
@@ -85,7 +85,7 @@ class OligoPuzzle:
         """
         return current best as solution
         """
-        bp_distance = [] 
+        bp_distance = []
         for i in range(self.n_targets):
             bp_distance.append(bp_distance_with_constraint(self.target[i]['secstruct'],self.best_native[i],self.target[i]['constrained']))
         return [self.best_sequence, bp_distance, self.best_design_score]
@@ -95,8 +95,10 @@ class OligoPuzzle:
         calculates overall design score, which is sum of bp distance component and scoring function component
         """
         match_score = float(self.n - self.score_secstructs(secstruct))/self.n
+        # in a small number of cases, get_design function causes error
+        # if this happens, assume 0 score
         try:
-            design = eterna_utils.get_design_from_sequence(sequence, secstruct[0])
+            design = eterna_utils.get_design_from_sequence(sequence, secstruct['single'])
             score = self.scoring_func(design)['finalscore']
             #score = 0
             #for i in range(self.n_targets):
@@ -104,12 +106,15 @@ class OligoPuzzle:
             #    design = eterna_utils.get_design_from_sequence(fold_sequence, secstruct[i])
             #    score += self.scoring_func(design)['finalscore']
             return match_score + self.score_weight*score
-        except IndexError:
+        except:
             return match_score 
 
     def get_fold_sequence(self, sequence, objective):
+        # append oligo sequences separated by & for type oligo
         if objective['type'] == 'oligo':
-            return '&'.join([sequence, objective['oligo_sequence']])
+            sequences = list(objective['oligo_sequence'])
+            sequences.insert(0,sequence)
+            return '&'.join(sequences)
         else:
             return sequence 
 
@@ -120,15 +125,17 @@ class OligoPuzzle:
         """
         native = []
         native_pairmap = []
-        for x in self.target:
-            fold_sequence = self.get_fold_sequence(sequence, x)
-            native_current = inv_utils.fold(fold_sequence)[0]
-            native.append(native_current)
-            native_pairmap.append(eterna_utils.get_pairmap_from_secstruct(native_current))
+        for i in range(self.n_targets):
+            fold_sequence = self.get_fold_sequence(sequence, self.target[i])
+            native.append(inv_utils.fold(fold_sequence)[0])
+            native_pairmap.append(eterna_utils.get_pairmap_from_secstruct(native[i]))
         design_score = self.get_design_score(sequence, native)
         return [sequence, native, native_pairmap, design_score]
 
     def reset_sequence(self):
+        """
+        reset sequence to the start sequence (for rerunning optimization)
+        """
         self.sequence = self.beginseq
         self.update_sequence(*self.get_sequence_info(self.sequence))
         self.update_best()
@@ -177,6 +184,19 @@ class OligoPuzzle:
     def check_current_secstructs(self):
         return self.score_secstructs(self.native) == 0
 
+    def optimize_single(self, secstruct, constraints):
+        """
+        default settings for optimizing a single sequence, no other inputs
+        """
+        if len(secstruct) <= 50:
+            score_cutoff = 70
+        elif len(secstruct) <= 80:
+            score_cutoff = 80
+        strategy_names = ['example_gc60', 'penguian_clean_dotplot', 'berex_simplified_berex_test']
+        ensemble = ensemble_utils.Ensemble("conventional", strategy_names, None)
+        res = inverse_fold_whole(secstruct, constraints, ensemble.score, score_cutoff, op == "conventional")
+        return res['end']
+
     def optimize_sequence(self, score_cutoff):
         """
         monte-carlo optimization of the sequence
@@ -212,9 +232,9 @@ class OligoPuzzle:
                 # if distance or score is better for mutant than best, update the best sequence    
                 if(score > self.best_design_score):
                     self.update_best()
-            if i > 50000:
-                print "optimization did not finish in 50000 iterations"
-                break
+                #if i > 50000:
+                #    print "optimization did not finish in 50000 iterations"
+                #    break
         
         print "%s iterations" % i  
         return
@@ -223,16 +243,23 @@ def read_puzzle_json(filename):
     """
     read in puzzle as a json file
     """
+
     with open(filename, 'r') as f:
         p = json.loads(f.read())['data']['puzzle']
+
+    # get basic parameters
     beginseq = p['beginseq']
     constraints = p['locks']
+
+    # load in objective secondary structures
     objective = json.loads(p['objective'])
     secstruct = [] 
     for o in objective:
         n = len(o['secstruct'])
+        # if no constrained bases, all are unconstrained
         if 'structure_constrained_bases' not in o.keys() and 'anti_structure_constrained_bases' not in o.keys():
             constrained = ensemble_design.get_sequence_array('x'*n)
+        # otherwise, combine structure and antistructure constraints
         else:
             constrained = ensemble_design.get_sequence_array('o'*n)
             struct = ensemble_design.get_sequence_array(o['secstruct'])
@@ -248,20 +275,26 @@ def read_puzzle_json(filename):
                     struct[i] = '.'
                 del o['anti_secstruct'], o['anti_structure_constrained_bases']
             o['secstruct'] = ensemble_design.get_sequence_string(struct)
-            o['constrained'] = ensemble_design.get_sequence_string(constrained)
-        #secstruct[o['type']] = [struct, constrained]
+        o['constrained'] = ensemble_design.get_sequence_string(constrained)
+        # make oligo sequence into a list, so we can handle multiple
+        if o['type'] == "oligo":
+            if type(o['oligo_sequence']) == unicode:
+                o['oligo_sequence'] = [o['oligo_sequence']]
         secstruct.append(o)
+
+    # create scoring function
     strategy_names = ['example_gc60', 'penguian_clean_dotplot', 'berex_simplified_berex_test']
     ensemble = ensemble_utils.Ensemble("conventional", strategy_names, None)
+
     puzzle = OligoPuzzle(beginseq, constraints, secstruct, ensemble.score)
     return puzzle
 
-def test_get_design(sequence):
-    secstruct = inv_utils.fold(sequence)[0]
-    try:
-        eterna_utils.get_design_from_sequence(sequence, secstruct)
-    except:
-        print sequence, secstruct
+#def test_get_design(sequence):
+#    secstruct = inv_utils.fold(sequence)[0]
+#    try:
+#        eterna_utils.get_design_from_sequence(sequence, secstruct)
+#    except:
+#        print sequence, secstruct
 
 class test_functions(unittest.TestCase):
 
@@ -283,9 +316,10 @@ class test_functions(unittest.TestCase):
 def main():
     puzzle = read_puzzle_json("%s.json" % sys.argv[1])
 
+    # run puzzle n times
     solutions = []
     scores = []
-    n = 1
+    n = 1000
     i = 0
     while i < n:
         puzzle.reset_sequence()
