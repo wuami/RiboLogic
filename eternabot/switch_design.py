@@ -356,14 +356,13 @@ def optimize_n(puzzle, niter, ncool, n, submit):
     # run puzzle n times
     solutions = []
     scores = []
-    i = 0
+    i = 4
     attempts = 0
     while i < n:
         puzzle.reset_sequence()
-        #sequence = "AGGGUCCGAAACUUGCCGAAAACGGCGAGACAUGAGGAUCACCCAUGUCUGCGACAGGUCCCAACACCUUCGCGUCA"
-        #puzzle.update_sequence(*puzzle.get_sequence_info(sequence))
         puzzle.optimize_sequence(niter, ncool)
-        if puzzle.check_current_secstructs():
+        if puzzle.check_current_secstructs() and \
+           "CCCC" not in puzzle.best_sequence and "GGGG" not in puzzle.best_sequence:
             sol = puzzle.get_solution()
             if sol[0] not in solutions:
                 solutions.append(sol[0])
@@ -390,6 +389,7 @@ def get_puzzle(id):
 def post_solution(puzzle, title):
     sequence = puzzle.best_sequence
     fold = inv_utils.fold(sequence)
+    print fold
     design = eterna_utils.get_design_from_sequence(sequence, fold[0])
     header = {'Content-Type': 'application/x-www-form-urlencoded'}
     login = {'type': 'login',
@@ -399,7 +399,7 @@ def post_solution(puzzle, title):
     solution = {'type': 'post_solution',
                 'puznid': puzzle.id,
                 'title': title,
-                'body': 'eternabot switch v1',
+                'body': 'eternabot switch v1, score %s' % puzzle.best_design_score,
                 'sequence': sequence,
                 'energy': fold[1],
                 'gc': design['gc'],
@@ -409,7 +409,7 @@ def post_solution(puzzle, title):
                 'pointsrank': 'false',
                 'recommend-puzzle': 'true'}
 
-    url = "http://eternadev.org"
+    url = "http://jnicol.eternadev.org"
     #url = 'http://eterna.cmu.edu'
     loginurl = "%s/login/" % url
     posturl = "%s/post/" % url
