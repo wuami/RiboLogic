@@ -70,9 +70,6 @@ def convert_sequence_constraints(sequence, constraints):
             result += sequence[i]
     return result
 
-
-
-
 class OligoPuzzle:
 
     def __init__(self, id, beginseq, constraints, targets, scoring_func):
@@ -343,8 +340,14 @@ def read_puzzle_json(text):
         secstruct.append(o)
 
     # create scoring function
-    strategy_names = ['example_gc60', 'penguian_clean_dotplot', 'berex_simplified_berex_test']
-    ensemble = ensemble_utils.Ensemble("conventional", strategy_names, None)
+    strategy_names = ['merryskies_only_as_in_the_loops', 'aldo_repetition', 'dejerpha_basic_test', 'eli_blue_line', 'clollin_gs_in_place', 'quasispecies_test_by_region_boundaries', 'eli_gc_pairs_in_junction', 'eli_no_blue_nucleotides_in_hook', 'mat747_31_loops', 'merryskies_1_1_loop', 'xmbrst_clear_plot_stack_caps_and_safe_gc', 'jerryp70_jp_stratmark', 'eli_energy_limit_in_tetraloops', 'eli_double_AUPair_strategy', 'eli_green_blue_strong_middle_half', 'eli_loop_pattern_for_small_multiloops', 'eli_tetraloop_similarity', 'example_gc60', 'penguian_clean_dotplot', 'eli_twisted_basepairs', 'aldo_loops_and_stacks', 'eli_direction_of_gc_pairs_in_multiloops_neckarea', 'eli_multiloop_similarity', 'eli_green_line', 'ding_quad_energy', 'quasispecies_test_by_region_loops', 'berex_berex_loop_basic', 'eli_legal_placement_of_GUpairs', 'merryskies_1_1_loop_energy', 'ding_tetraloop_pattern', 'aldo_mismatch', 'eli_tetraloop_blues', 'eli_red_line', 'eli_wrong_direction_of_gc_pairs_in_multiloops', 'deivad_deivad_strategy', 'eli_direction_of_gc_pairs_in_multiloops', 'eli_no_blue_nucleotides_strategy', 'berex_basic_test', 'eli_numbers_of_yellow_nucleotides_pr_length_of_string', 'kkohli_test_by_kkohli']
+    weights_file_name = "no_validation_training/weights_sparse_5.overall.txt"
+    scores_file_name = "no_validation_training/predicted_score_sparse_5.overall.unnormalized.txt"
+    weights_f = open(weights_file_name,"r")
+    weights = []
+    for line in weights_f:
+        weights.append(float(line))
+    ensemble = ensemble_utils.Ensemble("sparse", strategy_names, weights)
 
     puzzle = OligoPuzzle(id, beginseq, constraints, secstruct, ensemble.score)
     return puzzle
@@ -357,8 +360,8 @@ def optimize_n(puzzle, niter, ncool, n, submit):
     attempts = 0
     while i < n:
         puzzle.reset_sequence()
-        sequence = "AGGGUCCGAAACUUGCCGAAAACGGCGAGACAUGAGGAUCACCCAUGUCUGCGACAGGUCCCAACACCUUCGCGUCA"
-        puzzle.update_sequence(*puzzle.
+        #sequence = "AGGGUCCGAAACUUGCCGAAAACGGCGAGACAUGAGGAUCACCCAUGUCUGCGACAGGUCCCAACACCUUCGCGUCA"
+        #puzzle.update_sequence(*puzzle.get_sequence_info(sequence))
         puzzle.optimize_sequence(niter, ncool)
         if puzzle.check_current_secstructs():
             sol = puzzle.get_solution()
