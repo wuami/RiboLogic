@@ -126,7 +126,8 @@ class OligoPuzzle:
         return a random solution
         """
         r = random.randint(0, len(self.all_solutions)-1)
-        return self.all_solutions[r]
+        solution = self.all_solutions[r]
+        return [solution[0], 0, solution[1]]
 
     def get_design_score(self, sequence, secstruct):
         """
@@ -172,6 +173,7 @@ class OligoPuzzle:
         self.sequence = self.beginseq
         self.update_sequence(*self.get_sequence_info(self.sequence))
         self.update_best()
+        self.all_solutions = []
 
     def optimize_start_sequence(self):
         """
@@ -301,8 +303,8 @@ def read_puzzle_json(text):
     p = data['puzzle']
     id = data['nid']
 
-    if p['rna_type'] == 'single':
-        return SequenceDesigner(id, p['secstruct'], p['locks'])
+    #if p['rna_type'] == 'single':
+    #    return SequenceDesigner(id, p['secstruct'], p['locks'])
 
     # get basic parameters
     beginseq = p['beginseq']
@@ -333,7 +335,7 @@ def read_puzzle_json(text):
                 del o['anti_secstruct'], o['anti_structure_constrained_bases']
             o['secstruct'] = ensemble_design.get_sequence_string(struct)
         o['constrained'] = ensemble_design.get_sequence_string(constrained)
-        # make oligo sequence into a list, so we can handle multiple
+        # make oligo sequence into a list, so we can handle multiple using same format
         if o['type'] == "oligo":
             if type(o['oligo_sequence']) == unicode:
                 o['oligo_sequence'] = [o['oligo_sequence']]
@@ -356,26 +358,26 @@ def optimize_n(puzzle, niter, ncool, n, submit):
     # run puzzle n times
     solutions = []
     scores = []
-    i = 0
+    i = 0 
     attempts = 0
     while i < n:
         puzzle.reset_sequence()
-        #sequence = "AGGGUCCGAAACUUGCCGAAAACGGCGAGACAUGAGGAUCACCCAUGUCUGCGACAGGUCCCAACACCUUCGCGUCA"
-        #puzzle.update_sequence(*puzzle.get_sequence_info(sequence))
         puzzle.optimize_sequence(niter, ncool)
-        if puzzle.check_current_secstructs():
-            sol = puzzle.get_solution()
+        if puzzle.check_current_secstructs() and \
+           "CCCC" not in puzzle.best_sequence and "GGGG" not in puzzle.best_sequence:
+            sol = puzzle.get_random_solution()
             if sol[0] not in solutions:
                 solutions.append(sol[0])
                 scores.append(sol[2])
                 print sol
                 if submit:
-                    post_solution(puzzle, 'high scoring solution %s' % i)
+                    post_solution(puzzle, 'solution %s' % i)
                 i += 1
+                attempts = 0
         else:
-            niter += 500
+            #niter += 500
             attempts += 1
-            if attempts == 5:
+            if attempts == 10:
                 break
         print "%s sequence(s) calculated" % i
     return [solutions, scores]
@@ -399,7 +401,7 @@ def post_solution(puzzle, title):
     solution = {'type': 'post_solution',
                 'puznid': puzzle.id,
                 'title': title,
-                'body': 'eternabot switch v1',
+                'body': 'eternabot switch v1, score %s' % puzzle.best_design_score,
                 'sequence': sequence,
                 'energy': fold[1],
                 'gc': design['gc'],
@@ -409,7 +411,7 @@ def post_solution(puzzle, title):
                 'pointsrank': 'false',
                 'recommend-puzzle': 'true'}
 
-    url = "http://eternadev.org"
+    url = "http://jnicol.eternadev.org"
     #url = 'http://eterna.cmu.edu'
     loginurl = "%s/login/" % url
     posturl = "%s/post/" % url
