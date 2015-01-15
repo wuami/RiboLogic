@@ -72,7 +72,7 @@ def convert_sequence_constraints(sequence, constraints):
 
 class OligoPuzzle:
 
-    def __init__(self, id, beginseq, constraints, targets, scoring_func):
+    def __init__(self, id, beginseq, constraints, targets, scoring_func, inputs = None):
         # sequence information
         self.id = id
         self.beginseq = beginseq
@@ -88,10 +88,13 @@ class OligoPuzzle:
         self.n_targets = len(self.targets)
         self.single_index = 0
         self.target_pairmap = []
-        for i in range(self.n_targets):
-            if targets[i]['type'] == 'single':
+        for i, target in enumerate(self.targets):
+            if target['type'] == 'single':
                 self.single_index = i
-            self.target_pairmap.append(eterna_utils.get_pairmap_from_secstruct(targets[i]['secstruct']))
+            self.target_pairmap.append(eterna_utils.get_pairmap_from_secstruct(target['secstruct']))
+        self.inputs = inputs
+        self.linker_length = 5
+        self.linker = "U"*self.linker_length
 
         self.update_sequence(*self.get_sequence_info(self.sequence))
         
@@ -113,6 +116,7 @@ class OligoPuzzle:
         """
         return current best as solution
         """
+        print self.best_native
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
 
     def get_solutions(self):
@@ -145,9 +149,16 @@ class OligoPuzzle:
     def get_fold_sequence(self, sequence, objective):
         # append oligo sequences separated by & for type oligo
         if objective['type'] == 'oligo':
-            sequences = list(objective['oligo_sequence'])
-            sequences.insert(0,sequence)
-            return '&'.join(sequences)
+            return '&'.join([sequence, objective['oligo_sequence']])
+        elif objective['type'] == 'oligos':
+            inputs = []
+            for input in self.inputs:
+                if input in objective['inputs']:
+                    inputs.append(self.inputs[input])
+                else:
+                    inputs.append("U"*len(self.inputs[input]))
+            input_sequence = self.linker.join(inputs)
+            return '&'.join([sequence, input_sequence])
         else:
             return sequence 
 
@@ -160,7 +171,10 @@ class OligoPuzzle:
         native_pairmap = []
         for i in range(self.n_targets):
             fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
-            native.append(inv_utils.fold(fold_sequence)[0])
+            fold = inv_utils.fold(fold_sequence)[0]
+            if self.targets[i]['type'] == "oligos":
+                fold = fold.split('&')[0]
+            native.append(fold)
             native_pairmap.append(eterna_utils.get_pairmap_from_secstruct(native[i]))
         bp_distance = self.score_secstructs(native)
         design_score = self.get_design_score(sequence, native)
@@ -309,6 +323,10 @@ def read_puzzle_json(text):
     # get basic parameters
     beginseq = p['beginseq']
     constraints = p['locks']
+    if p['rna_type'] == "multi_input":
+        inputs = p['inputs']
+    else:
+        inputs = None
 
     # load in objective secondary structures
     objective = json.loads(p['objective'])
@@ -335,10 +353,6 @@ def read_puzzle_json(text):
                 del o['anti_secstruct'], o['anti_structure_constrained_bases']
             o['secstruct'] = ensemble_design.get_sequence_string(struct)
         o['constrained'] = ensemble_design.get_sequence_string(constrained)
-        # make oligo sequence into a list, so we can handle multiple using same format
-        if o['type'] == "oligo":
-            if type(o['oligo_sequence']) == unicode:
-                o['oligo_sequence'] = [o['oligo_sequence']]
         secstruct.append(o)
 
     # create scoring function
@@ -351,7 +365,7 @@ def read_puzzle_json(text):
         weights.append(float(line))
     ensemble = ensemble_utils.Ensemble("sparse", strategy_names, weights)
 
-    puzzle = OligoPuzzle(id, beginseq, constraints, secstruct, ensemble.score)
+    puzzle = OligoPuzzle(id, beginseq, constraints, secstruct, ensemble.score, inputs)
     return puzzle
 
 def optimize_n(puzzle, niter, ncool, n, submit):
@@ -365,7 +379,7 @@ def optimize_n(puzzle, niter, ncool, n, submit):
         puzzle.optimize_sequence(niter, ncool)
         if puzzle.check_current_secstructs() and \
            "CCCC" not in puzzle.best_sequence and "GGGG" not in puzzle.best_sequence:
-            sol = puzzle.get_random_solution()
+            sol = puzzle.get_solution()
             if sol[0] not in solutions:
                 solutions.append(sol[0])
                 scores.append(sol[2])

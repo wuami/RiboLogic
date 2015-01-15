@@ -29,9 +29,9 @@ def fold(seq):
     """
     # run ViennaRNA
     if '&' in seq:
-        p = Popen(['RNAcofold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        p = Popen(['./RNAcofold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     else:
-        p = Popen(['RNAfold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        p = Popen(['./RNAfold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     pair= p.communicate(input=''.join(seq))[0]
     p.wait()
 
