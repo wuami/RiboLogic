@@ -10,11 +10,11 @@ from subprocess import Popen, PIPE, STDOUT
 import thread, time, sys
 from threading import Timer
 
-    
+
 DEFAULT_TEMPERATURE = 37.0
 BASES = ['A','U','G','C']
 #fold a sequence
-#@param seq:sequence 
+#@param seq:sequence
 #@return: [parenthesis notation, energy]
 
 def fold(seq):
@@ -29,9 +29,9 @@ def fold(seq):
     """
     # run ViennaRNA
     if '&' in seq:
-        p = Popen(['./RNAcofold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        p = Popen(['RNAcofold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     else:
-        p = Popen(['./RNAfold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        p = Popen(['RNAfold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     pair= p.communicate(input=''.join(seq))[0]
     p.wait()
 
@@ -57,7 +57,7 @@ def fill_gc(elem , pair_map , seq, rand ):
         else:
             seq[idx]="C"
             seq[pair_map[idx]]="G"
-            
+
 def tout():
     thread.interrupt_main()
 
@@ -83,4 +83,4 @@ def timeout(func, args=(), timeout_duration=10, default=[]):
         ret.append(default)
         ret.append("timeout")
     return ret
-    
+

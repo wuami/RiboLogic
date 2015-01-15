@@ -1,13 +1,13 @@
 %!PS-Adobe-3.0 EPSF-3.0
-%%Creator: PS_dot.c,v 1.38 2007/02/02 15:18:13 ivo Exp $, ViennaRNA-2.1.8
-%%CreationDate: Wed Jan 14 14:03:19 2015
+%%Creator: PS_dot.c,v 1.38 2007/02/02 15:18:13 ivo Exp $, ViennaRNA-1.8.4
+%%CreationDate: Wed Jan 14 22:41:15 2015
 %%Title: RNA Secondary Structure Plot
 %%BoundingBox: 66 210 518 662
 %%DocumentFonts: Helvetica
 %%Pages: 1
 %%EndComments
 
-%Options: -d2 
+%Options: 
 % to switch off outline pairs of sequence comment or
 % delete the appropriate line near the end of the file
 
@@ -21,33 +21,6 @@ RNAplot begin
 /cshow  { dup stringwidth pop -2 div fsize -3 div rmoveto show} bind def
 /min { 2 copy gt { exch } if pop } bind def
 /max { 2 copy lt { exch } if pop } bind def
-/arccoords { % i j arccoords
-  % puts optimal x1 y1 x2 y2 coordinates used in bezier curves from i to j
-  % onto the stack
-  dup 3 -1 roll dup 4 -1 roll lt dup dup 5 2 roll {exch} if
-  dup 3 -1 roll dup 3 -1 roll exch sub 1 sub dup
-  4 -2 roll 5 -1 roll {exch} if 4 2 roll
-  sequence length dup 2 div exch 3 1 roll lt 
-  {exch 5 -1 roll pop 4 -2 roll exch 4 2 roll}
-  { 4 2 roll 5 -1 roll dup 6 1 roll {exch} if
-    4 -2 roll exch pop dup 3 -1 roll dup 4 1 roll
-    exch add 4 -1 roll dup 5 1 roll sub 1 sub
-    5 -1 roll not {4 -2 roll exch 4 2 roll} if
-  }ifelse
-   % compute the scalingfactor and prepare (1-sf) and sf*r
-  2 mul exch cpr 3 1 roll div dup
-  3 -1 roll mul exch 1 exch sub exch
-   % compute the coordinates
-  3 -1 roll 1 sub coor exch get aload pop % get coord for i
-  4 -1 roll dup 5 1 roll mul 3 -1 roll dup 4 1 roll add exch % calculate y1
-  4 -1 roll dup 5 1 roll mul 3 -1 roll dup 4 1 roll add exch % calculate x1
-  5 -1 roll 1 sub coor exch get aload pop % get coord for j
-  % duplicate j coord
-  dup 3 -1 roll dup 4 1 roll exch 8 2 roll
-  6 -1 roll dup 7 1 roll mul 5 -1 roll dup 6 1 roll add exch % calculate y2
-  6 -1 roll mul 5 -1 roll add exch % calculate x2
-  6 -2 roll % reorder
-} bind def
 /drawoutline {
   gsave outlinecolor newpath
   coor 0 get aload pop 0.8 0 360 arc % draw 5' circle of 1st sequence
@@ -68,14 +41,8 @@ RNAplot begin
   [9 3.01] 9 setdash
   newpath
   pairs {aload pop
-      currentdict (cpr) known
-      { exch dup
-        coor  exch 1 sub get aload pop moveto
-        exch arccoords curveto
-      }
-      { coor exch 1 sub get aload pop moveto
-        coor exch 1 sub get aload pop lineto
-      }ifelse
+     coor exch 1 sub get aload pop moveto
+     coor exch 1 sub get aload pop lineto
   } forall
   stroke
 } bind def
@@ -118,110 +85,24 @@ end
 RNAplot begin
 % data start here
 /sequence (\
-AUUCUAGCCUAGGCUACAAACCCCUAAGAACAUGAGGAUCACCCAUGUGUGAGGGAUGUGCGUAUGUACUUAACGGG\
+AGCAAAAGCU\
 ) def
 /coor [
-[24.05494118 216.66670227]
-[16.05866241 228.16383362]
-[3.91733670 235.00843811]
-[-9.92565536 235.88964844]
-[-22.71326828 230.69009399]
-[-33.94092941 240.63693237]
-[-45.16859055 250.58377075]
-[-56.39625168 260.53060913]
-[-61.07327271 276.24868774]
-[-77.08469391 279.79357910]
-[-87.95933533 267.51864624]
-[-82.51030731 252.05126953]
-[-66.34309387 249.30294800]
-[-55.11543274 239.35610962]
-[-43.88777161 229.40927124]
-[-32.66011047 219.46243286]
-[-36.29429626 203.84963989]
-[-31.60808563 188.42260742]
-[-19.76826668 177.34207153]
-[-3.88389111 173.64497375]
-[11.80981827 178.41247559]
-[22.62785530 168.02162170]
-[33.44589233 157.63075256]
-[37.25939178 140.62397766]
-[54.96472549 136.05987549]
-[65.35559082 125.24183655]
-[75.74645233 114.42379761]
-[86.13732147 103.60575867]
-[89.66953278 90.07745361]
-[103.04463959 86.00337219]
-[113.43550873 75.18533325]
-[123.82637024 64.36730194]
-[134.21723938 53.54926300]
-[144.60810852 42.73122787]
-[148.58766174 27.41869164]
-[162.98431396 23.59956932]
-[166.96386719 8.28703499]
-[181.36051941 4.46791124]
-[191.75138855 -6.35012531]
-[191.60638428 -21.92628479]
-[202.29830933 -32.74929047]
-[217.14869690 -32.79152679]
-[227.53956604 -43.60956192]
-[237.93041992 -54.42760086]
-[235.06243896 -69.67733002]
-[241.73616028 -83.68593597]
-[255.38542175 -91.06681824]
-[270.76177979 -88.98188782]
-[281.95272827 -78.23282623]
-[284.65512085 -62.95288467]
-[277.82983398 -49.01750183]
-[264.10131836 -41.78511810]
-[248.74845886 -44.03673553]
-[238.35758972 -33.21869659]
-[227.96673584 -22.40066147]
-[228.52249146 -7.56062412]
-[218.13877869 3.55842543]
-[202.56941223 4.04074001]
-[192.17855835 14.85877705]
-[188.94223022 29.39753342]
-[173.80235291 33.99043274]
-[170.56600952 48.52919006]
-[155.42614746 53.12209320]
-[145.03527832 63.94012833]
-[134.64440918 74.75816345]
-[124.25354767 85.57620239]
-[113.86267853 96.39424133]
-[110.33046722 109.92254639]
-[96.95536041 113.99662781]
-[86.56449127 124.81466675]
-[76.17362976 135.63270569]
-[65.78276062 146.45072937]
-[65.21635437 159.51727295]
-[56.10582733 168.32830811]
-[43.83675766 168.44879150]
-[33.01872253 178.83966064]
-[22.20068359 189.23051453]
+[92.500 92.500]
+[92.500 77.500]
+[92.500 62.500]
+[83.836 48.576]
+[91.800 34.241]
+[108.200 34.241]
+[116.164 48.576]
+[107.500 62.500]
+[107.500 77.500]
+[107.500 92.500]
 ] def
 /pairs [
-[5 16]
-[6 15]
-[7 14]
-[8 13]
-[21 77]
-[22 76]
-[23 75]
-[25 72]
-[26 71]
-[27 70]
-[28 69]
-[30 67]
-[31 66]
-[32 65]
-[33 64]
-[34 63]
-[36 61]
-[38 59]
-[39 58]
-[42 55]
-[43 54]
-[44 53]
+[1 10]
+[2 9]
+[3 8]
 ] def
 
 init
