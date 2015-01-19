@@ -2,7 +2,8 @@ import ensemble_utils
 import eterna_utils
 import sys
 import re
-
+import os
+import settings
 
 
 #JEEFIX for conventional
@@ -29,7 +30,7 @@ else:
 	print "No type specified"
 	sys.exit(0)
 
-weight_file = open(weights_file_name,'r')
+weight_file = open(os.path.join(settings.base_dir, weights_file_name),'r')
 weights = []
 iter = 0
 for line in weight_file:
@@ -38,7 +39,7 @@ for line in weight_file:
 	iter += 1
 weight_file.close()
 
-scores_file = open(scores_file_name,'r')
+scores_file = open(os.path.join(settings.base_dir, scores_file_name),'r')
 scores = []
 iter = 0
 for line in scores_file:

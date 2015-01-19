@@ -8,6 +8,7 @@ import os
 import math
 import simplejson
 import subprocess
+import settings
 
 def initial_sequence_with_gc_caps(secstruct, sequence_constraints, no_gccap): 
     """
@@ -481,7 +482,7 @@ def main():
     elif op == "sparse":
         weights_file_name = "no_validation_training/weights_sparse_5.overall.txt"
         scores_file_name = "no_validation_training/predicted_score_sparse_5.overall.unnormalized.txt"
-        weights_f = open(weights_file_name,"r")
+        weights_f = open(os.path.join(settings.base_dir, weights_file_name),"r")
         weights = []
         for line in weights_f:
             weights.append(float(line))

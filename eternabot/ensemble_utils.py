@@ -145,10 +145,10 @@ class Ensemble:
                 for ii in range(0,len(strategies)+1):
                     my_weights.append(float(tempi[ii][0]))
 
-            fw = open("strategies/weights_%s.txt" % method, "w")
-            fs = open("strategies/strategies_%s.txt" % method, "w")
-            fn = open("strategies/normalized/mean_%s.txt" % method, "w")
-            fst = open("strategies/normalized/stdev_%s.txt" % method, "w")
+            fw = open(os.path.join(settings.base_dir, "strategies/weights_%s.txt" % method), "w")
+            fs = open(os.path.join(settings.base_dir, "strategies/strategies_%s.txt" % method), "w")
+            fn = open(os.path.join(settings.base_dir, "strategies/normalized/mean_%s.txt" % method), "w")
+            fst = open(os.path.join(settings.base_dir, "strategies/normalized/stdev_%s.txt" % method), "w")
 
             fw.write(simplejson.dumps(my_weights))
             fs.write(simplejson.dumps(strategy_names))

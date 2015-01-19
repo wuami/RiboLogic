@@ -1,13 +1,5 @@
-<<<<<<< HEAD
-AGCAAAAGCU
-(((....))) ( -0.90)
-,((....)), [ -1.35]
-.((....)). { -0.80 d=0.71}
- frequency of mfe structure in ensemble 0.478157; ensemble diversity 0.90  
-=======
-GCUGCAACCUCAUCGCCUCACAUGAGGAUCACCCAUGUCUUGCUCGCGAAGGGCGACAAGCUCUUCAGCAAACGGAA
-.......((((((........))))))........(((.(((((...(((((((.....)))))))))))))))... (-22.20)
-.......((((((........)))))).....,..,((.(((((...(((((((.....)))))))))))))))}.. [-23.34]
-.......((((((........)))))).........((.(((((...(((((((.....)))))))))))))).... {-21.30 d=5.02}
- frequency of mfe structure in ensemble 0.156613; ensemble diversity 8.75  
->>>>>>> Michelle.switch
+CCGCAGAUUAACACAAAAUGCGAUUAUCCUCACAGACCCACAUGAGGAUCACCCAUGUGCCCGUGUGCCCACGUAUUUAUUUGGAAGCCGUUCGUUAUAA
+.((((.............))))....(((.........((((((.((....))))))))..((((....)))).........)))............... (-18.12)
+.,{{,...,,,,...|,,||||......,,{{{,,...((((((.((....))))))))..,|||,,..|}))},,,,...}}|,....,.,,}},.... [-20.86]
+......................................((((((.((....))))))))......................................... { -8.60 d=18.32}
+ frequency of mfe structure in ensemble 0.0117694; ensemble diversity 29.09 

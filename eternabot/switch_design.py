@@ -10,6 +10,7 @@ import math
 import json
 import argparse
 import requests
+import settings
 
 def bp_distance_with_constraint(secstruct1, secstruct2, locks):
     """
@@ -93,7 +94,7 @@ class OligoPuzzle:
                 self.single_index = i
             self.target_pairmap.append(eterna_utils.get_pairmap_from_secstruct(target['secstruct']))
         self.inputs = inputs
-        self.linker_length = 5
+        self.linker_length = 5 
         self.linker = "U"*self.linker_length
 
         self.update_sequence(*self.get_sequence_info(self.sequence))
@@ -116,7 +117,10 @@ class OligoPuzzle:
         """
         return current best as solution
         """
-        print self.best_native
+        for i in range(self.n_targets):
+            fold_sequence = self.get_fold_sequence(self.best_sequence, self.targets[i])
+            print fold_sequence
+            print inv_utils.fold(fold_sequence)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
 
     def get_solutions(self):
@@ -152,7 +156,7 @@ class OligoPuzzle:
             return '&'.join([sequence, objective['oligo_sequence']])
         elif objective['type'] == 'oligos':
             inputs = []
-            for input in self.inputs:
+            for input in sorted(self.inputs):
                 if input in objective['inputs']:
                     inputs.append(self.inputs[input])
                 else:
@@ -264,14 +268,12 @@ class OligoPuzzle:
 
         def p_dist(dist, new_dist):
             """probability function"""
-            #print dist, new_dist, math.exp(-(new_dist-dist)/T)
             if dist == 0:
                return 0
             return math.exp(-(new_dist-dist)/T)
 
         def p_score(score, new_score):
             """probability function for design scores"""
-            #print score, new_score, math.exp((new_score-score)/T)
             return math.exp((new_score-score)/T)
     
         # loop as long as bp distance too large or design score too small
@@ -359,7 +361,7 @@ def read_puzzle_json(text):
     strategy_names = ['merryskies_only_as_in_the_loops', 'aldo_repetition', 'dejerpha_basic_test', 'eli_blue_line', 'clollin_gs_in_place', 'quasispecies_test_by_region_boundaries', 'eli_gc_pairs_in_junction', 'eli_no_blue_nucleotides_in_hook', 'mat747_31_loops', 'merryskies_1_1_loop', 'xmbrst_clear_plot_stack_caps_and_safe_gc', 'jerryp70_jp_stratmark', 'eli_energy_limit_in_tetraloops', 'eli_double_AUPair_strategy', 'eli_green_blue_strong_middle_half', 'eli_loop_pattern_for_small_multiloops', 'eli_tetraloop_similarity', 'example_gc60', 'penguian_clean_dotplot', 'eli_twisted_basepairs', 'aldo_loops_and_stacks', 'eli_direction_of_gc_pairs_in_multiloops_neckarea', 'eli_multiloop_similarity', 'eli_green_line', 'ding_quad_energy', 'quasispecies_test_by_region_loops', 'berex_berex_loop_basic', 'eli_legal_placement_of_GUpairs', 'merryskies_1_1_loop_energy', 'ding_tetraloop_pattern', 'aldo_mismatch', 'eli_tetraloop_blues', 'eli_red_line', 'eli_wrong_direction_of_gc_pairs_in_multiloops', 'deivad_deivad_strategy', 'eli_direction_of_gc_pairs_in_multiloops', 'eli_no_blue_nucleotides_strategy', 'berex_basic_test', 'eli_numbers_of_yellow_nucleotides_pr_length_of_string', 'kkohli_test_by_kkohli']
     weights_file_name = "no_validation_training/weights_sparse_5.overall.txt"
     scores_file_name = "no_validation_training/predicted_score_sparse_5.overall.unnormalized.txt"
-    weights_f = open(weights_file_name,"r")
+    weights_f = open(os.path.join(settings.RESOURCE_DIR, weights_file_name),"r")
     weights = []
     for line in weights_f:
         weights.append(float(line))
@@ -460,15 +462,16 @@ def main():
     p.add_argument('--nowrite', help="suppress write to file", default=False, action='store_true')
     args = p.parse_args()
 
-    if os.path.isfile("%s.json" % args.puzzleid): 
-        with open("%s.json" % args.puzzleid, 'r') as f:
+    puzzlefile = os.path.join(settings.PUZZLE_DIR, "%s.json" % args.puzzleid)
+    if os.path.isfile(puzzlefile): 
+        with open(puzzlefile, 'r') as f:
             puzzle = read_puzzle_json(f.read())
     else:
         puzzle = get_puzzle(args.puzzleid)
     [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, args.submit)
 
     if not args.nowrite:
-        with open(args.puzzleid + ".out", 'w') as fout:
+        with open(os.path.join(settings.PUZZLE_DIR, args.puzzleid + ".out"), 'w') as fout:
             for i in range(len(solutions)):
                 fout.write("%s\t%1.6f\n" % (solutions[i], scores[i]))
 

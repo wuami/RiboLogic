@@ -9,6 +9,7 @@ import re
 from subprocess import Popen, PIPE, STDOUT
 import thread, time, sys
 from threading import Timer
+import settings
 
 
 DEFAULT_TEMPERATURE = 37.0
@@ -28,10 +29,11 @@ def fold(seq):
     secondary structure
     """
     # run ViennaRNA
+    print os.path.join(settings.VIENNA_DIR,'RNAfold')
     if '&' in seq:
-        p = Popen(['./RNAcofold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     else:
-        p = Popen(['./RNAfold', '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAfold'), '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     pair= p.communicate(input=''.join(seq))[0]
     p.wait()
 
@@ -39,7 +41,7 @@ def fold(seq):
     toks = re.split('\s+| \(?\s?',pair)
     ret= []
     ret.append(toks[1])
-    ret.append(toks[2][1:-1])
+    ret.append(toks[3][:-1])
     return ret
 
 def fill_gc(elem , pair_map , seq, rand ):
