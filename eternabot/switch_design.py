@@ -471,7 +471,8 @@ def main():
     [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, args.submit)
 
     if not args.nowrite:
-        with open(os.path.join(settings.PUZZLE_DIR, args.puzzleid + ".out"), 'w') as fout:
+        with open(os.path.join(settings.PUZZLE_DIR, args.puzzleid + ".out"), 'a') as fout:
+	    fout.write("# %s iterations, %s coolings\n" % (args.niter, args.ncool))
             for i in range(len(solutions)):
                 fout.write("%s\t%1.6f\n" % (solutions[i], scores[i]))
 

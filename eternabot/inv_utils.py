@@ -29,7 +29,6 @@ def fold(seq):
     secondary structure
     """
     # run ViennaRNA
-    print os.path.join(settings.VIENNA_DIR,'RNAfold')
     if '&' in seq:
         p = Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     else:
