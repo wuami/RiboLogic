@@ -18,15 +18,19 @@ json = open(os.path.join(settings.PUZZLE_DIR, "%s.json" % args.puzzleid)).read()
 puzzle = read_puzzle_json(json)
 inputs = puzzle.inputs
 n = len(inputs)
-colors = 1/(1+n)
+colors = 1.0/(1+n)
 colormaps = []
 for target in puzzle.targets:
-    colormap = "1.0;"*puzzle.n
-    for i, key in enumerate(sorted(inputs)):
-        if key in target['inputs']:
-            colormap += "0.0;"
-            colormap += (str(i*colors)+';')*len(inputs[key]) 
-    colormaps.append(colormap)
+     colormap = "1.0;"*puzzle.n
+     for i, key in enumerate(sorted(inputs)):
+         if i != 0:
+            colormap += "0.0;"*puzzle.linker_length
+         if key in target['inputs']:
+             colormap += (str((i+1)*colors)+';')*len(inputs[key])
+         else:
+             colormap += "0.0;"*len(inputs[key])
+     print colormap
+     colormaps.append(colormap)
 
 # draw image for each sequence
 n_sequences = 0
@@ -36,8 +40,8 @@ with open(os.path.join(settings.PUZZLE_DIR, "%s.out" % args.puzzleid), 'r') as f
             seq = line.split()[0]
             for j, target in enumerate(puzzle.targets):
                 foldseq = puzzle.get_fold_sequence(seq, target)
-                foldseq = foldseq.replace("&", "\&")
                 secstruct = inv_utils.fold(foldseq)[0]
+                foldseq = foldseq.replace("&", "\&")
                 filename = "%s/images/%s_%s-%s.png" % (settings.PUZZLE_DIR, args.puzzleid, n_sequences, j)
                 v.new_image_by_str(filename, secstruct, foldseq, colormap_str=colormaps[j])
             n_sequences += 1
@@ -50,6 +54,6 @@ with open(htmlfile, 'w') as f:
     for i in range(n_sequences):
         f.write("<tr>\n")
         for j in range(puzzle.n_targets):
-            f.write("\t<td><img src=\"%s_%s-%s.png\"></td>\n" % (args.puzzleid, i, j))
+            f.write("\t<td><img src=\"%s_%s-%s.png\" style=\"max-width:500px;max-height:500px\"></td>\n" % (args.puzzleid, i, j))
         f.write("</tr>\n")
     f.write("</body>\n</html>")

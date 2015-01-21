@@ -94,7 +94,7 @@ class OligoPuzzle:
                 self.single_index = i
             self.target_pairmap.append(eterna_utils.get_pairmap_from_secstruct(target['secstruct']))
         self.inputs = inputs
-        self.linker_length = 5 
+        self.linker_length = 5
         self.linker = "U"*self.linker_length
 
         self.update_sequence(*self.get_sequence_info(self.sequence))
@@ -370,7 +370,10 @@ def read_puzzle_json(text):
     puzzle = OligoPuzzle(id, beginseq, constraints, secstruct, ensemble.score, inputs)
     return puzzle
 
-def optimize_n(puzzle, niter, ncool, n, submit):
+def optimize_n(puzzle, niter, ncool, n, submit, fout):
+    if fout:
+	    fout.write("# %s iterations, %s coolings\n" % (niter, ncool))
+
     # run puzzle n times
     solutions = []
     scores = []
@@ -388,6 +391,8 @@ def optimize_n(puzzle, niter, ncool, n, submit):
                 print sol
                 if submit:
                     post_solution(puzzle, 'solution %s' % i)
+                if fout:
+                    fout.write("%s\t%1.6f\n" % (sol[0], sol[2]))
                 i += 1
                 attempts = 0
         else:
@@ -468,13 +473,14 @@ def main():
             puzzle = read_puzzle_json(f.read())
     else:
         puzzle = get_puzzle(args.puzzleid)
-    [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, args.submit)
-
     if not args.nowrite:
-        with open(os.path.join(settings.PUZZLE_DIR, args.puzzleid + ".out"), 'a') as fout:
-	    fout.write("# %s iterations, %s coolings\n" % (args.niter, args.ncool))
-            for i in range(len(solutions)):
-                fout.write("%s\t%1.6f\n" % (solutions[i], scores[i]))
+        fout = open(os.path.join(settings.PUZZLE_DIR, args.puzzleid + ".out"), 'a')
+    else:
+        fout = False
+    [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, args.submit, fout)
+
+    if fout:
+        fout.close()
 
 if __name__ == "__main__":
     #unittest.main()
