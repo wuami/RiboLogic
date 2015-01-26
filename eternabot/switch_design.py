@@ -151,7 +151,7 @@ class OligoPuzzle:
             return 0
 
     def get_fold_sequence(self, sequence, objective):
-        # append oligo sequences separated by & for type oligo
+        """ append oligo sequences separated by & for type oligo """
         if objective['type'] == 'oligo':
             return '&'.join([sequence, objective['oligo_sequence']])
         elif objective['type'] == 'oligos':
@@ -372,7 +372,8 @@ def read_puzzle_json(text):
 
 def optimize_n(puzzle, niter, ncool, n, submit, fout):
     if fout:
-	    fout.write("# %s iterations, %s coolings\n" % (niter, ncool))
+        with open(fout, 'a') as f:
+	        f.write("# %s iterations, %s coolings\n" % (niter, ncool))
 
     # run puzzle n times
     solutions = []
@@ -382,8 +383,7 @@ def optimize_n(puzzle, niter, ncool, n, submit, fout):
     while i < n:
         puzzle.reset_sequence()
         puzzle.optimize_sequence(niter, ncool)
-        if puzzle.check_current_secstructs() and \
-           "CCCC" not in puzzle.best_sequence and "GGGG" not in puzzle.best_sequence:
+        if puzzle.check_current_secstructs():
             sol = puzzle.get_solution()
             if sol[0] not in solutions:
                 solutions.append(sol[0])
@@ -392,7 +392,8 @@ def optimize_n(puzzle, niter, ncool, n, submit, fout):
                 if submit:
                     post_solution(puzzle, 'solution %s' % i)
                 if fout:
-                    fout.write("%s\t%1.6f\n" % (sol[0], sol[2]))
+                    with open(fout, 'a') as f:
+                        f.write("%s\t%1.6f\n" % (sol[0], sol[2]))
                 i += 1
                 attempts = 0
         else:
@@ -474,7 +475,7 @@ def main():
     else:
         puzzle = get_puzzle(args.puzzleid)
     if not args.nowrite:
-        fout = open(os.path.join(settings.PUZZLE_DIR, args.puzzleid + ".out"), 'a')
+        fout = os.path.join(settings.PUZZLE_DIR, args.puzzleid + ".out")
     else:
         fout = False
     [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, args.submit, fout)

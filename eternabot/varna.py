@@ -27,7 +27,7 @@ class Varna(object):
         subprocess.call(self.varna_command + " -sequenceDBN " + sequence_str + " -structureDBN \"" + sstructure_str + "\" -o " + filename + " -colorMap \"" + colormap_str + "\" -colorMapStyle " + colormapstyle, 
             shell=True)
 
-    def new_image_by_str(self,filename,sstructure_str,sequence_str,colormapstyle="red",highlight_res_num=[],size=[],colormap_str=""):
+    def new_image_by_str(self,filename,sstructure_str,sequence_str,colormapstyle="red",highlight_region="",size=[],colormap_str=""):
         
 
         #colormap = [0 for x in range(len(sequence_str))]
@@ -51,8 +51,10 @@ class Varna(object):
         #subprocess.call(self.varna_command + " -sequenceDBN " + sequence_str + " -structureDBN \"" + sstructure_str + "\" -o " + filename + " -colorMap \"" + colormap_str + "\" -colorMapStyle " + colormapstyle +  " -bp \"#000000\" -periodNum 10 -spaceBetweenBases 0.7", 
         #   shell=True)
 
-        subprocess.call(self.varna_command + " -sequenceDBN " + sequence_str + " -structureDBN \"" + sstructure_str + "\" -o " + filename + " -colorMap \"" + colormap_str + "\" -flat false", 
-            shell=True)
+        command = self.varna_command + " -sequenceDBN " + sequence_str + " -structureDBN \"" + sstructure_str + "\" -o " + filename + " -colorMap \"" + colormap_str + "\" -flat false -spaceBetweenBases 0.5"
+        if highlight_region:
+            command += " -highlightRegion \"" + highlight_region + "\""
+        subprocess.call(command, shell=True)
 
         return
 
