@@ -1,7 +1,7 @@
 import ensemble_design
 import ensemble_utils
 import eterna_utils
-import switch_designer
+import switch_designer, gate_designer
 import sys
 import os
 import json
@@ -23,10 +23,6 @@ def read_puzzle_json(text):
     # get basic parameters
     beginseq = p['beginseq']
     constraints = p['locks']
-    if p['rna_type'] == "multi_input":
-        inputs = p['inputs']
-    else:
-        inputs = None
 
     # load in objective secondary structures
     objective = json.loads(p['objective'])
@@ -65,9 +61,12 @@ def read_puzzle_json(text):
         weights.append(float(line))
     ensemble = ensemble_utils.Ensemble("sparse", strategy_names, weights)
 
-    puzzle = switch_designer.SwitchDesigner(id, beginseq, constraints, secstruct, ensemble.score, inputs)
-    return puzzle
-
+    if p['rna_type'] == "multi_input":
+        return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, ensemble.score, p['inputs'])
+    elif p['rna_type'] == "multi_input_oligo":
+        return gate_designer.GateDesigner(id, p['rna_type'], beginseq, constraints, secstruct, ensemble.score, p['inputs'])
+    return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, ensemble.score)
+    
 def optimize_n(puzzle, niter, ncool, n, submit, fout):
     if fout:
         with open(fout, 'a') as f:

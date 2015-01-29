@@ -4,6 +4,37 @@ import random
 import math
 import ensemble_design
 import unittest
+import sys
+
+def bp_distance_with_unpaired(secstruct1, secstruct2, locks):
+    """
+    calculates distance between two secondary structures
+    
+    args:
+    secstruct1 is the first secondary structure
+    secstruct2 is the second secondary structure
+    locks specifies the positions that are constrained
+    
+    returns:
+    bp distance between structures
+    """
+    # ensure that secondary structures are the same length
+    #if(len(secstruct1) != len(secstruct2)):
+    #    print "SS1 and SS2 lengths don't match"
+    #    sys.exit(0)
+    
+    # generate pair mappings
+    #pairmap1 = eterna_utils.get_pairmap_from_secstruct(secstruct1)
+    #pairmap2 = eterna_utils.get_pairmap_from_secstruct(secstruct2)
+    
+    # +1 for each pair or single that doesn't match
+    dist = 0
+    for ii in range(0,len(locks)):
+        if(locks[ii] == "o"):
+            continue
+        if(secstruct1[ii] != secstruct2[ii]):
+            dist += 1
+    return dist
 
 def bp_distance_with_constraint(secstruct1, secstruct2, locks):
     """
@@ -28,8 +59,7 @@ def bp_distance_with_constraint(secstruct1, secstruct2, locks):
     
     # +1 for each pair or single that doesn't match
     dist = 0
-    
-    for ii in range(0,len(pairmap1)):
+    for ii in range(0,len(locks)):
         if(locks[ii] == "o"):
             continue
         if(pairmap1[ii] != pairmap2[ii]):
@@ -37,7 +67,6 @@ def bp_distance_with_constraint(secstruct1, secstruct2, locks):
                 dist += 1
             if(pairmap2[ii] > ii):
                 dist += 1
-    
     return dist
 
 def complement(base):
@@ -64,18 +93,24 @@ def convert_sequence_constraints(sequence, constraints):
             result += sequence[i]
     return result
 
-class SwitchDesigner:
+class SwitchDesigner(object):
 
-    def __init__(self, id, beginseq, constraints, targets, scoring_func, inputs = None):
+    def __init__(self, id, type, beginseq, constraints, targets, scoring_func, inputs = None):
         # sequence information
         self.id = id
+        self.type = type
         self.beginseq = beginseq
         self.sequence = beginseq
         self.n = len(self.sequence)
         self.constraints = constraints
         self.index_array = self.get_unconstrained_indices()
 
+        # scoring
         self.scoring_func = scoring_func
+        if type == "multi_input_oligo":
+            self.bp_distance_func = bp_distance_with_unpaired
+        else:
+            self.bp_distance_func = bp_distance_with_constraint
 
         # target information
         self.targets = targets
@@ -89,6 +124,8 @@ class SwitchDesigner:
         self.inputs = inputs
         self.linker_length = 5
         self.linker = "U"*self.linker_length
+        self.designlinker = "GUUUCACCCCUAAACACCAC"
+        self.oligotail = "AUUGUUAGUUAGGUAAAAAA"
 
         self.update_sequence(*self.get_sequence_info(self.sequence))
         
@@ -155,7 +192,7 @@ class SwitchDesigner:
                 else:
                     inputs.append("U"*len(self.inputs[input]))
             input_sequence = self.linker.join(inputs)
-            return '&'.join([sequence, input_sequence])
+            return self.designlinker.join([sequence, input_sequence]) + self.oligotail
         else:
             return sequence 
 
@@ -169,10 +206,10 @@ class SwitchDesigner:
         for i in range(self.n_targets):
             fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
             fold = inv_utils.fold(fold_sequence)[0]
-            if self.targets[i]['type'] == "oligos":
-                fold = fold.split('&')[0]
+            native_pairmap.append(eterna_utils.get_pairmap_from_secstruct(fold)[:len(sequence)])
             native.append(fold)
-            native_pairmap.append(eterna_utils.get_pairmap_from_secstruct(native[i]))
+            if self.targets[i]['type'] == "oligos":
+                fold = fold[:len(sequence)]
         bp_distance = self.score_secstructs(native)
         design_score = self.get_design_score(sequence, native)
         return [sequence, native, native_pairmap, bp_distance, design_score]
@@ -226,7 +263,7 @@ class SwitchDesigner:
         """
         distance = 0
         for i in range(self.n_targets):
-            distance += bp_distance_with_constraint(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'])
+            distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'])
         return distance
 
     def check_secstructs(self, secstruct):
