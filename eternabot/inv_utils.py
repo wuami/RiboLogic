@@ -18,7 +18,7 @@ BASES = ['A','U','G','C']
 #@param seq:sequence
 #@return: [parenthesis notation, energy]
 
-def fold(seq):
+def fold(seq, constraint=False):
     """
     folds sequence using Vienna
 
@@ -29,11 +29,17 @@ def fold(seq):
     secondary structure
     """
     # run ViennaRNA
-    if '&' in seq:
-        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    if constraint:
+        options = "-C"
+        input = seq + "\n" + constraint
     else:
-        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAfold'), '-T','37.0'], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
-    pair= p.communicate(input=''.join(seq))[0]
+        options = ""
+        input = ''.join(seq)
+    if '&' in seq:
+        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    else:
+        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAfold'), '-T','37.0', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    pair= p.communicate(input=input)[0]
     p.wait()
 
     # split result by whitespace

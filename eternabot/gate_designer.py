@@ -31,9 +31,10 @@ class GateDesigner(switch_designer.SwitchDesigner):
         """
         distance = 0
         for i in range(self.n_targets):
-            dist = self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'])
             if "threshold" in self.targets[i]:
-                dist = max(0, dist-self.targets[i]['threshold'])
+                dist = self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'], self.targets[i]['threshold'])
+            else:
+                dist = self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'])
             distance += dist
         return distance
 
@@ -56,10 +57,11 @@ class GateDesigner(switch_designer.SwitchDesigner):
             if (random.random() < 0.5 or self.oligo_len[1]-self.oligo_len[0] <= 0) and \
                 self.oligo_len[1]-self.oligo_len[0] != len(self.oligo_rc)-1:
                 if (rindex or self.oligo_pos[0] == self.index_array[0] or self.oligo_len[0] == 0) and \
-                    self.oligo_pos[1] != self.index_array[-1] and self.oligo_len[1] != len(self.oligo_rc)-1:
+                    self.oligo_pos[1] != self.index_array[-1] and self.oligo_len[1] != len(self.oligo_rc)-1 and\
+                    self.constraints[self.oligo_pos[rindex]+1] != 'x':
                     self.oligo_pos[rindex] += 1
                     self.oligo_len[rindex] += 1
-                else:
+                elif self.constraints[self.oligo_pos[rindex]-1] != 'x':
                     self.oligo_pos[rindex] -= 1
                     self.oligo_len[rindex] -= 1
                 mut_array[self.oligo_pos[rindex]] = self.oligo_rc[self.oligo_len[rindex]]
@@ -105,6 +107,9 @@ class GateDesigner(switch_designer.SwitchDesigner):
         if len(self.index_array) == 0:
             return
 
+        #for target in self.targets:
+        #    print target
+
         #self.optimize_start_sequence()
         T = 5
 
@@ -124,7 +129,7 @@ class GateDesigner(switch_designer.SwitchDesigner):
             
             # pick random nucleotide in sequence
             mut_sequence = self.mutate_sequence(self.sequence)
-            [mut_sequence, native, native_pairmap, bp_distance, score] = self.get_sequence_info(mut_sequence)
+            [mut_sequence, native, bp_distance, score] = self.get_sequence_info(mut_sequence)
 
             # if current sequence is a solution, save to list
             if bp_distance == 0:
@@ -133,7 +138,10 @@ class GateDesigner(switch_designer.SwitchDesigner):
             # if distance or score is better for mutant, update the current sequence
             if(random.random() < p_dist(self.bp_distance, bp_distance) or
                (bp_distance == self.bp_distance and random.random() < p_score(self.design_score, score))):
-                self.update_sequence(mut_sequence, native, native_pairmap, bp_distance, score)
+                self.update_sequence(mut_sequence, native, bp_distance, score)
+                #print self.sequence, self.bp_distance
+                #for struct in native:
+                #    print struct[0:22], struct[78:97]
             
                 # if distance or score is better for mutant than best, update the best sequence    
                 if(bp_distance < self.best_bp_distance or

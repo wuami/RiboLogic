@@ -1,4 +1,6 @@
 import eterna_utils
+import varna, draw_utils
+import settings
 import inv_utils
 import random
 import math
@@ -6,7 +8,7 @@ import ensemble_design
 import unittest
 import sys
 
-def bp_distance_with_unpaired(secstruct1, secstruct2, locks):
+def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
     """
     calculates distance between two secondary structures
     
@@ -19,22 +21,30 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks):
     bp distance between structures
     """
     # ensure that secondary structures are the same length
-    #if(len(secstruct1) != len(secstruct2)):
-    #    print "SS1 and SS2 lengths don't match"
-    #    sys.exit(0)
+    if(len(secstruct1) != len(secstruct2)):
+        print "SS1 (%s) and SS2 (%s) lengths don't match" % (len(secstruct1), len(secstruct2))
+        sys.exit(0)
     
     # generate pair mappings
-    #pairmap1 = eterna_utils.get_pairmap_from_secstruct(secstruct1)
-    #pairmap2 = eterna_utils.get_pairmap_from_secstruct(secstruct2)
+    pairmap1 = eterna_utils.get_pairmap_from_secstruct(secstruct1)
+    pairmap2 = eterna_utils.get_pairmap_from_secstruct(secstruct2)
     
     # +1 for each pair or single that doesn't match
     dist = 0
+    udist = 0
     for ii in range(0,len(locks)):
         if(locks[ii] == "o"):
             continue
-        if(secstruct1[ii] != secstruct2[ii]):
-            dist += 1
-    return dist
+        elif(locks[ii] == "u"):
+            if(secstruct1[ii] != secstruct2[ii]):
+                udist += 1
+        else:
+            if(pairmap1[ii] != pairmap2[ii]):
+                if(pairmap1[ii] > ii):
+                    dist += 1
+                if(pairmap2[ii] > ii):
+                    dist += 1
+    return dist + max(0, udist-threshold)
 
 def bp_distance_with_constraint(secstruct1, secstruct2, locks):
     """
@@ -50,7 +60,7 @@ def bp_distance_with_constraint(secstruct1, secstruct2, locks):
     """
     # ensure that secondary structures are the same length
     if(len(secstruct1) != len(secstruct2)):
-        print "SS1 and SS2 lengths don't match"
+        print "SS1 (%s) and SS2 (%s) lengths don't match" % (len(secstruct1), len(secstruct2))
         sys.exit(0)
     
     # generate pair mappings
@@ -69,17 +79,19 @@ def bp_distance_with_constraint(secstruct1, secstruct2, locks):
                 dist += 1
     return dist
 
-def complement(base):
-    if base == "G":
-        return "C"
-    elif base == "C":
-        return "G"
-    elif base == "U":
-        return "A"
-    elif base == "A":
-        return "U"
-    else:
-        return "A"
+def rc(bases):
+    rc = ""
+    for base in reversed(bases):
+        if base == "G":
+            rc += "C"
+        elif base == "C":
+            rc += "G"
+        elif base == "U":
+            rc += "A"
+        elif base == "A":
+            rc += "U"
+    return rc
+
 
 def convert_sequence_constraints(sequence, constraints):
     """
@@ -95,7 +107,7 @@ def convert_sequence_constraints(sequence, constraints):
 
 class SwitchDesigner(object):
 
-    def __init__(self, id, type, beginseq, constraints, targets, scoring_func, inputs = None):
+    def __init__(self, id, type, beginseq, constraints, targets, scoring_func, inputs = None, mode = "ghost"):
         # sequence information
         self.id = id
         self.type = type
@@ -107,32 +119,63 @@ class SwitchDesigner(object):
 
         # scoring
         self.scoring_func = scoring_func
-        if type == "multi_input_oligo":
-            self.bp_distance_func = bp_distance_with_unpaired
-        else:
-            self.bp_distance_func = bp_distance_with_constraint
+        #if type == "multi_input_oligo":
+        self.bp_distance_func = bp_distance_with_unpaired
+        #else:
+        #    self.bp_distance_func = bp_distance_with_constraint
+        self.mode = mode
 
         # target information
         self.targets = targets
         self.n_targets = len(self.targets)
-        self.single_index = 0
-        self.target_pairmap = []
-        for i, target in enumerate(self.targets):
-            if target['type'] == 'single':
-                self.single_index = i
-            self.target_pairmap.append(eterna_utils.get_pairmap_from_secstruct(target['secstruct']))
         self.inputs = inputs
         self.linker_length = 5
-        self.linker = "U"*self.linker_length
-        self.designlinker = "GUUUCACCCCUAAACACCAC"
-        self.oligotail = "AUUGUUAGUUAGGUAAAAAA"
+        self.linker = ensemble_design.get_sequence_string(["C" if i % 5 == 2 else "A" for i in range(self.linker_length)])
+        #self.linker = "U"*self.linker_length
+        self.design_linker = ""#GUUUCACCCCUAAACACCAC"
+        self.oligotail = ""#AUUGUUAGUUAGGUAAAAAA"
+        if type == "multi_input" or type == "multi_input_oligo":
+            self.create_target_secstructs()
 
         self.update_sequence(*self.get_sequence_info(self.sequence))
         
         # maintain sequences
         self.update_best()
         self.all_solutions = []
-        
+
+    def create_target_secstructs(self):
+        """ add oligo secstructs to target secstruct """
+        for target in self.targets:
+            if target['type'] == 'oligos':
+                # create beginning linker
+                target['secstruct'] += '.'*self.linker_length
+                target['constrained'] += 'u'*self.linker_length
+                if self.mode == "ghost":
+                    target['fold_constraint'] = '.'*(self.n+self.linker_length)
+                # add each input
+                for i,input in enumerate(sorted(self.inputs)):
+                    seq = self.inputs[input]
+                    if input in target['inputs']:
+                        if self.mode == "hairpin":
+                            hairpin_len = (len(seq)-4)/2
+                            secstruct = '('*hairpin_len + '.'*(len(seq)-2*hairpin_len) + ')'*hairpin_len
+                        elif self.mode == "ghost":
+                            secstruct = '.'*len(seq)
+                            target['fold_constraint'] += 'x'*len(seq)
+                        target['secstruct'] += secstruct
+                        target['constrained'] += 'u'*len(seq)
+                    else:
+                        target['secstruct'] += '.'*len(seq)
+                        target['constrained'] += 'o'*len(seq)
+                        if self.mode == "ghost":
+                            target['fold_constraint'] += '.'*len(seq)
+                    # add linker sequence
+                    #if i != len(self.inputs)-1:
+                    target['secstruct'] += '.'*self.linker_length
+                    target['constrained'] += 'u'*self.linker_length
+                    if self.mode == "ghost":
+                        target['fold_constraint'] += '.'*self.linker_length
+
     def get_unconstrained_indices(self):
         """
         get indices for positions that can change)
@@ -150,8 +193,24 @@ class SwitchDesigner(object):
         for i in range(self.n_targets):
             fold_sequence = self.get_fold_sequence(self.best_sequence, self.targets[i])
             print fold_sequence
-            print inv_utils.fold(fold_sequence)[0]
+            if self.mode == "ghost":
+                print inv_utils.fold(fold_sequence, self.targets[i]['fold_constraint'])[0]
+            else:
+                print inv_utils.fold(fold_sequence)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
+
+    def draw_solution(self):
+        # initiate varna RNA visualizer
+        v = varna.Varna()
+        
+        # get puzzle object and generate colormaps for each objective
+        n = len(self.inputs)
+        colormaps = draw_utils.get_colormaps(self.targets, self.inputs, self.n, self.linker_length, self.design_linker, n)
+        
+        # draw image for each sequence
+        for i, target in enumerate(self.targets):
+            filename = "%s/images/%s_%s-%s.png" % (settings.PUZZLE_DIR, self.id, 0, i)
+            draw_utils.draw_secstruct_state(v, target, self.get_fold_sequence(self.sequence, target), colormaps[i], filename)
 
     def get_solutions(self):
         """
@@ -175,10 +234,18 @@ class SwitchDesigner(object):
         # if this happens, assume 0 score
         try:
             design = eterna_utils.get_design_from_sequence(sequence, secstruct[self.single_index])
-            score = self.scoring_func(design)['finalscore']
+            score = self.scoring_func(design)
             return score
         except:
             return 0
+
+    def get_hairpin(self, seq, begin):
+        """ turn sequence into hairpin """
+        n = (len(seq)-4)/2
+        if begin:
+            return seq[0:n] + seq[n:len(seq)-n] + rc(seq[0:n])
+        else:
+            return rc(seq[-n:]) + seq[n:len(seq)-n] + seq[-n:]
 
     def get_fold_sequence(self, sequence, objective):
         """ append oligo sequences separated by & for type oligo """
@@ -186,13 +253,21 @@ class SwitchDesigner(object):
             return '&'.join([sequence, objective['oligo_sequence']])
         elif objective['type'] == 'oligos':
             inputs = []
-            for input in sorted(self.inputs):
+            for i,input in enumerate(sorted(self.inputs)):
                 if input in objective['inputs']:
-                    inputs.append(self.inputs[input])
+                    #inputs.append(self.inputs[input])
+                    if self.mode == "ghost":
+                        inputs.append(rc(self.inputs[input]))
+                    elif i == len(self.inputs)-1:
+                        inputs.append(self.get_hairpin(rc(self.inputs[input]), False))
+                    else:
+                        inputs.append(self.get_hairpin(rc(self.inputs[input]), True))
                 else:
-                    inputs.append("U"*len(self.inputs[input]))
-            input_sequence = self.linker.join(inputs)
-            return self.designlinker.join([sequence, input_sequence]) + self.oligotail
+                    #inputs.append("U"*len(self.inputs[input]))
+                    inputs.append(rc(self.inputs[input]))
+            #input_sequence = self.linker.join(inputs)
+            input_sequence = self.linker + self.linker.join(inputs) + self.linker
+            return self.design_linker.join([sequence, input_sequence]) + self.oligotail
         else:
             return sequence 
 
@@ -202,17 +277,18 @@ class SwitchDesigner(object):
         for a particular sequence
         """
         native = []
-        native_pairmap = []
         for i in range(self.n_targets):
             fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
-            fold = inv_utils.fold(fold_sequence)[0]
-            native_pairmap.append(eterna_utils.get_pairmap_from_secstruct(fold)[:len(sequence)])
+            if self.mode == "ghost":
+                fold = inv_utils.fold(fold_sequence, self.targets[i]['fold_constraint'])[0]
+            else:
+                fold = inv_utils.fold(fold_sequence)[0]
+            #if self.targets[i]['type'] == "oligos" and self.type != "multi_input_oligo":
+            #    fold = fold[:len(sequence)]
             native.append(fold)
-            if self.targets[i]['type'] == "oligos":
-                fold = fold[:len(sequence)]
         bp_distance = self.score_secstructs(native)
         design_score = self.get_design_score(sequence, native)
-        return [sequence, native, native_pairmap, bp_distance, design_score]
+        return [sequence, native, bp_distance, design_score]
 
     def reset_sequence(self):
         """
@@ -233,14 +309,13 @@ class SwitchDesigner(object):
         self.update_sequence(*self.get_sequence_info(sequence))
         return
 
-    def update_sequence(self, sequence, native, native_pairmap, bp_distance, score):
+    def update_sequence(self, sequence, native, bp_distance, score):
         """
         updates current sequence and related information
         """
         self.sequence = sequence
-        [sequence, native, native_pairmap, bp_distance, score] = self.get_sequence_info(sequence)
+        [sequence, native, bp_distance, score] = self.get_sequence_info(sequence)
         self.native = native
-        self.native_pairmap = native_pairmap
         self.bp_distance = bp_distance
         self.design_score = score
 
@@ -250,7 +325,6 @@ class SwitchDesigner(object):
         """
         self.best_sequence = self.sequence
         self.best_native = self.native
-        self.best_native_pairmap = self.native_pairmap
         self.best_bp_distance = self.bp_distance
         self.best_design_score = self.design_score
 
@@ -293,7 +367,9 @@ class SwitchDesigner(object):
         if len(self.index_array) == 0:
             return
 
+        #print self.targets
         #self.optimize_start_sequence()
+
         T = 5
 
         def p_dist(dist, new_dist):
@@ -317,7 +393,7 @@ class SwitchDesigner(object):
             mut_array[rindex] = ensemble_design.get_random_base()
             
             mut_sequence = ensemble_design.get_sequence_string(mut_array)
-            [mut_sequence, native, native_pairmap, bp_distance, score] = self.get_sequence_info(mut_sequence)
+            [mut_sequence, native, bp_distance, score] = self.get_sequence_info(mut_sequence)
 
             # if current sequence is a solution, save to list
             if bp_distance == 0:
@@ -326,7 +402,10 @@ class SwitchDesigner(object):
             # if distance or score is better for mutant, update the current sequence
             if(random.random() < p_dist(self.bp_distance, bp_distance) or
                (bp_distance == self.bp_distance and random.random() < p_score(self.design_score, score))):
-                self.update_sequence(mut_sequence, native, native_pairmap, bp_distance, score)
+                self.update_sequence(mut_sequence, native, bp_distance, score)
+                #print self.sequence, self.bp_distance
+                #for i in range(self.n_targets):
+                #    print self.native[i]
             
                 # if distance or score is better for mutant than best, update the best sequence    
                 if(bp_distance < self.best_bp_distance or

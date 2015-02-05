@@ -85,7 +85,7 @@ class Varna(object):
                         if num > max_y:
                             max_y = num
             
-        lines[4:5] = "<svg width=\"300pt\" height=\"300pt\" viewBox=\"0 0 "+str(max_x+20)+" "+str(max_y+20)+"\" xmlns=\"http://www.w3.org/2000/svg\">\n"
+        lines[4:5] = "<svg width=\"500pt\" height=\"500pt\" viewBox=\"0 0 "+str(max_x+20)+" "+str(max_y+20)+"\" xmlns=\"http://www.w3.org/2000/svg\">\n"
 
         del lines[-84:]
 
