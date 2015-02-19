@@ -14,8 +14,10 @@ def main():
     v = varna.Varna()
     
     # get puzzle object and generate colormaps for each objective
-    json = open(os.path.join(settings.PUZZLE_DIR, "%s.json" % args.puzzleid)).read()
-    puzzle = read_puzzle_json(json)
+    spl = args.puzzleid.rsplit('_', 1)
+    spl[0] = "xor_gate"
+    json = open(os.path.join(settings.PUZZLE_DIR, "%s.json" % spl[0])).read()
+    puzzle = read_puzzle_json(json, spl[1])
     inputs = puzzle.inputs
     n = len(inputs)
     colormaps = draw_utils.get_colormaps(puzzle.targets, inputs, puzzle.n, puzzle.linker_length, puzzle.design_linker, n)
@@ -28,11 +30,11 @@ def main():
                 seq = line.split()[0]
                 for j, target in enumerate(puzzle.targets):
                     filename = "%s/images/%s_%s-%s.png" % (settings.PUZZLE_DIR, args.puzzleid, n_sequences, j)
-                    draw_utils.draw_secstruct_state(v, target, puzzle.get_fold_sequence(seq, target), colormaps[j], filename)
+                    #draw_utils.draw_secstruct_state(v, target, puzzle.get_fold_sequence(seq, target), colormaps[j], filename)
                 n_sequences += 1
     
     # create html to display images
-    draw_utils.write_html(args.puzzleid, n_sequences, n_targets)
+    draw_utils.write_html(args.puzzleid, n_sequences, puzzle.n_targets, state_order = [3,1,2,0])
 
 if __name__ == "__main__":
     main()

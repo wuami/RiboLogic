@@ -46,7 +46,7 @@ def fold(seq, constraint=False):
     toks = re.split('\s+| \(?\s?',pair)
     ret= []
     ret.append(toks[1])
-    ret.append(toks[3][:-1])
+    ret.append(toks[2][1:-1])
     return ret
 
 def fill_gc(elem , pair_map , seq, rand ):

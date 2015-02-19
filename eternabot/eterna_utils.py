@@ -8,6 +8,7 @@ import os
 import re
 import imp
 import settings
+from subprocess import Popen, PIPE, STDOUT
 
 UNSCORABLE = -99999
 
@@ -439,9 +440,22 @@ def fill_energy(elements,sequence,pairmap):
             elements[ii].score_ = total_energy / 100.0
 
 
-def get_dotplot(sequence):
+def get_dotplot(sequence, constraint=False):
     #os.system("echo " + sequence + " | ./vienna_windows_binaries/RNAfold.exe -p > rnafold_dump")
-    os.system("echo " + sequence + " | RNAfold -p > rnafold_dump")
+    #os.system("echo " + sequence + " | RNAfold -p > rnafold_dump")
+    # run ViennaRNA
+    if constraint:
+        options = "-C"
+        input = sequence + "\n" + constraint
+    else:
+        options = ""
+        input = ''.join(sequence)
+    if '&' in sequence:
+        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0', '-p', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    else:
+        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAfold'), '-T','37.0', '-p', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    pair= p.communicate(input=input)[0]
+    p.wait()
 
     # get info from output file
     try:
@@ -585,7 +599,7 @@ def fill_design(design):
         print "CALCULATED : " + str(total_energy)
 
 
-def get_design_from_sequence(sequence,secstruct):
+def get_design_from_sequence(sequence,secstruct,constraint = False):
     """
     get the design dict of the sequence
 
@@ -627,7 +641,7 @@ def get_design_from_sequence(sequence,secstruct):
     design['ua'] = au_count
     design['secstruct_elements'] = get_rna_elements_from_secstruct(design['secstruct'])
 
-    design['dotplot'] = get_dotplot(design['sequence'])
+    design['dotplot'] = get_dotplot(design['sequence'], constraint)
     fill_energy(design['secstruct_elements'],design['sequence'],design['pairmap'])
     elements = design['secstruct_elements']
     total_energy = 0.0

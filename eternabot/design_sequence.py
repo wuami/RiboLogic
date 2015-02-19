@@ -1,7 +1,8 @@
 import ensemble_design
 import ensemble_utils
-import eterna_utils
-import switch_designer, gate_designer
+import eterna_utils, inv_utils
+import design_utils
+import switch_designer
 import sys
 import os
 import json
@@ -11,7 +12,7 @@ import settings
 import varna
 
     
-def read_puzzle_json(text, mode):
+def read_puzzle_json(text, mode = "ghost", scoring = "bpp"):
     """
     read in puzzle as a json file
     """
@@ -39,9 +40,10 @@ def read_puzzle_json(text, mode):
             constrained = ensemble_design.get_sequence_array('o'*n)
             struct = ensemble_design.get_sequence_array(o['secstruct'])
             if 'structure_constrained_bases' in o.keys() and len(o['structure_constrained_bases']) > 0:
-                [lo, hi] = o['structure_constrained_bases']
-                for i in range(lo, hi+1):
-                    constrained[i] = 'x'
+                for i in range(0, len(o['structure_constrained_bases']), 2):
+                    [lo, hi] = o['structure_constrained_bases'][i:i+2]
+                    for j in range(lo, hi+1):
+                        constrained[j] = 'x'
                 del o['structure_constrained_bases']
             if 'anti_structure_constrained_bases' in o.keys() and len(o['anti_structure_constrained_bases']) > 0:
                 [lo, hi] = o['anti_structure_constrained_bases']
@@ -58,14 +60,21 @@ def read_puzzle_json(text, mode):
         o['constrained'] = ensemble_design.get_sequence_string(constrained)
         secstruct.append(o)
 
-    #scoring_func = get_ensemble_scoring_func()
-    scoring_func = get_bpp_scoring_func(secstruct)
+    if scoring == "bpp":
+        scoring_func = design_utils.get_bpp_scoring_func(secstruct)
+    elif scoring == "ensemble":
+        scoring_func = design_utils.get_ensemble_scoring_func()
+    elif scoring == "landing":
+        scoring_func = design_utils.get_strategy_scoring_func("eli_landing_lane")
+    else:
+        raise ValueError("invalid scoring function")
 
-    if p['rna_type'] == "multi_input":
-        return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, scoring_func, p['inputs'], mode)
-    elif p['rna_type'] == "multi_input_oligo":
-        return gate_designer.GateDesigner(id, p['rna_type'], beginseq, constraints, secstruct, scoring_func, p['inputs'], mode)
-    return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, scoring_func, mode=mode)
+    if 'linker' not in p:
+        p['linker'] = "AACAA"
+
+    if p['rna_type'] == "multi_input" or p['rna_type'] == "multi_input_oligo":
+        return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring_func, p['inputs'], mode)
+    return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring_func, mode=mode)
 
 def optimize_n(puzzle, niter, ncool, n, submit, draw, fout):
     if fout:
@@ -89,7 +98,7 @@ def optimize_n(puzzle, niter, ncool, n, submit, draw, fout):
                 if submit:
                     post_solution(puzzle, 'solution %s' % i)
                 if draw:
-                    puzzle.draw_solution()
+                    puzzle.draw_solution(i)
                 if fout:
                     with open(fout, 'a') as f:
                         f.write("%s\t%1.6f\n" % (sol[0], sol[2]))
@@ -103,24 +112,33 @@ def optimize_n(puzzle, niter, ncool, n, submit, draw, fout):
         print "%s sequence(s) calculated" % i
     return [solutions, scores]
 
-def get_puzzle(id, mode):
+def get_puzzle(id, mode, scoring):
     puzzlefile = os.path.join(settings.PUZZLE_DIR, "%s.json" % id)
     if os.path.isfile(puzzlefile): 
         with open(puzzlefile, 'r') as f:
-            puzzle = read_puzzle_json(f.read(), mode)
+            puzzle = read_puzzle_json(f.read(), mode, scoring)
     else:
-        puzzle = get_puzzle_from_server(args.puzzleid, mode)
+        puzzle = get_puzzle_from_server(id, mode, scoring)
     return puzzle
 
-def get_puzzle_from_server(id, mode):
+def get_puzzle_from_server(id, mode, scoring):
     """
     get puzzle with id number id from eterna server
     """
     r = requests.get('http://nando.eternadev.org/get/?type=puzzle&nid=%s' % id)
-    return read_puzzle_json(r.text, mode)
+    return read_puzzle_json(r.text, mode, scoring)
 
-def post_solution(puzzle, title):
-    sequence = puzzle.best_sequence
+def post_solutions(puzzleid, filename, mode):
+    filename = os.path.join(settings.PUZZLE_DIR, filename)
+    for i, sol in enumerate(open(filename, 'r')):
+        if sol.startswith('#'):
+            continue
+        spl = sol.split()
+        post_solution(puzzleid, "eternabot solution %s" % i, "UUUGCUCGUCUUAUCUUCUUCGC" +spl[0], spl[1])
+        print i
+    return
+
+def post_solution(puzzleid, title, sequence, score):
     fold = inv_utils.fold(sequence)
     design = eterna_utils.get_design_from_sequence(sequence, fold[0])
     header = {'Content-Type': 'application/x-www-form-urlencoded'}
@@ -129,9 +147,9 @@ def post_solution(puzzle, title):
              'pass': 'iamarobot',
              'workbranch': 'main'}
     solution = {'type': 'post_solution',
-                'puznid': puzzle.id,
+                'puznid': puzzleid,
                 'title': title,
-                'body': 'eternabot switch v1, score %s' % puzzle.best_design_score,
+                'body': 'eternabot solution, score %s' % score,
                 'sequence': sequence,
                 'energy': fold[1],
                 'gc': design['gc'],
@@ -142,7 +160,6 @@ def post_solution(puzzle, title):
                 'recommend-puzzle': 'true'}
 
     url = "http://jnicol.eternadev.org"
-    #url = 'http://eterna.cmu.edu'
     loginurl = "%s/login/" % url
     posturl = "%s/post/" % url
     with requests.Session() as s:
@@ -151,50 +168,10 @@ def post_solution(puzzle, title):
     return
 
 def view_sequence(puzzle, seq):
-    puzzle.update_sequence(*puzzle.get_sequence_info(seq))
+    puzzle.update_sequence(seq)
     puzzle.update_best()
     print puzzle.targets
     print puzzle.get_solution()
-
-def get_ensemble_scoring_func():
-    # create scoring function
-    strategy_names = ['merryskies_only_as_in_the_loops', 'aldo_repetition', 'dejerpha_basic_test', 'eli_blue_line', 'clollin_gs_in_place', 'quasispecies_test_by_region_boundaries', 'eli_gc_pairs_in_junction', 'eli_no_blue_nucleotides_in_hook', 'mat747_31_loops', 'merryskies_1_1_loop', 'xmbrst_clear_plot_stack_caps_and_safe_gc', 'jerryp70_jp_stratmark', 'eli_energy_limit_in_tetraloops', 'eli_double_AUPair_strategy', 'eli_green_blue_strong_middle_half', 'eli_loop_pattern_for_small_multiloops', 'eli_tetraloop_similarity', 'example_gc60', 'penguian_clean_dotplot', 'eli_twisted_basepairs', 'aldo_loops_and_stacks', 'eli_direction_of_gc_pairs_in_multiloops_neckarea', 'eli_multiloop_similarity', 'eli_green_line', 'ding_quad_energy', 'quasispecies_test_by_region_loops', 'berex_berex_loop_basic', 'eli_legal_placement_of_GUpairs', 'merryskies_1_1_loop_energy', 'ding_tetraloop_pattern', 'aldo_mismatch', 'eli_tetraloop_blues', 'eli_red_line', 'eli_wrong_direction_of_gc_pairs_in_multiloops', 'deivad_deivad_strategy', 'eli_direction_of_gc_pairs_in_multiloops', 'eli_no_blue_nucleotides_strategy', 'berex_basic_test', 'eli_numbers_of_yellow_nucleotides_pr_length_of_string', 'kkohli_test_by_kkohli']
-    weights_file_name = "no_validation_training/weights_sparse_5.overall.txt"
-    scores_file_name = "no_validation_training/predicted_score_sparse_5.overall.unnormalized.txt"
-    weights_f = open(os.path.join(settings.RESOURCE_DIR, weights_file_name),"r")
-    weights = []
-    for line in weights_f:
-        weights.append(float(line))
-    ensemble = ensemble_utils.Ensemble("sparse", strategy_names, weights)
-    def scoring_func(designs):
-        return ensemble.score(designs[0])['finalscore']
-    return scoring_func
-
-class Scorer():
-    def __init__(self, targets):
-        MS2 = []
-        for target in targets:
-            i = target['secstruct'].find('(((((.((....)))))))')
-            if i == -1:
-                MS2.append(False)
-            else:
-                MS2.append(True)
-                self.indices = [i, i+18]
-        self.MS2 = MS2
-
-    def score(self, designs):
-        score = 0
-        for i,design in enumerate(designs):
-            p = [score[2] for score in dotplot if score[0] == self.indices[0] and score[1] == self.indices[1]]
-            if MS2[i]:
-                score += p[0]
-            else:
-                score -= p[0]
-        return score
-            
-def get_bpp_scoring_func(targets): 
-    s = Scorer(targets)
-    return s.score
 
 def main():
     # parse arguments
@@ -202,15 +179,16 @@ def main():
     p.add_argument('puzzleid', help="name of puzzle filename or eterna id number", type=str)
     p.add_argument('-s', '--nsol', help="number of solutions", type=int, default=1)
     p.add_argument('-i', '--niter', help="number of iterations", type=int, default=1000)
-    p.add_argument('-c', '--ncool', help="number of times to cool", type=int, default=20)
+    p.add_argument('-c', '--ncool', help="number of times to cool", type=int, default=50)
     p.add_argument('-m', '--mode', help="mode for multi inputs", type=str, default="ghost")
+    p.add_argument('-o', '--score', help="scoring function", type=str, default="bpp")
     p.add_argument('--submit', help="submit the solution(s)", default=False, action='store_true')
     p.add_argument('--draw', help="draw the solution(s)", default=False, action='store_true')
     p.add_argument('--nowrite', help="suppress write to file", default=False, action='store_true')
     args = p.parse_args()
 
     # read puzzle
-    puzzle = get_puzzle(args.puzzleid, args.mode)
+    puzzle = get_puzzle(args.puzzleid, args.mode, args.score)
     if not args.nowrite:
         fout = os.path.join(settings.PUZZLE_DIR, args.puzzleid + "_" + puzzle.mode + ".out")
     else:
@@ -218,7 +196,7 @@ def main():
     
     #seq = "CUAUACAAUCUACUGUCUUUCUUUUUUAACUACAGCGUCUUUGUAAAACAUCCACCUUCUCAUGAGCAAUGGCGUCUAGCAUGAGGAUCACCCAUGUAGUUUAGGACGCAGAGCGAAGUACGUGCACCACAU"
     #seq = "UUAAAUUCUAAAGAAGCAGCUGAAAUGACGUCGGUUUCUACAUGAGGAUCACCCAUGUUGACAAGGCGAGCACCUAU"
-    #puzzle.update_sequence(*puzzle.get_sequence_info(seq))
+    #puzzle.update_sequence(seq)
     #puzzle.update_best()
     #puzzle.draw_solution()
     #view_sequence(puzzle, seq)
