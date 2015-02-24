@@ -1,14 +1,14 @@
 import csv
 import httplib2
 import sys
-import random
+import random, string
 import math
 import vienna_parameters
 import os
 import re
 import imp
 import settings
-from subprocess import Popen, PIPE, STDOUT
+import subprocess
 
 UNSCORABLE = -99999
 
@@ -441,32 +441,33 @@ def fill_energy(elements,sequence,pairmap):
 
 
 def get_dotplot(sequence, constraint=False):
-    #os.system("echo " + sequence + " | ./vienna_windows_binaries/RNAfold.exe -p > rnafold_dump")
-    #os.system("echo " + sequence + " | RNAfold -p > rnafold_dump")
-    # run ViennaRNA
-    if constraint:
-        options = "-C"
-        input = sequence + "\n" + constraint
-    else:
-        options = ""
-        input = ''.join(sequence)
+    """ run ViennaRNA to get bp probability matrix """
+    filename = "".join(random.sample(string.lowercase,5))
+    with open(filename+".fa",'w') as f:
+        f.write(">%s\n" % filename)
+        f.write("%s\n" % sequence)
+        if constraint:
+            options = " -C"
+            f.write("%s\n" % constraint)
+        else:
+            options = ""
     if '&' in sequence:
-        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0', '-p', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        subprocess.call(os.path.join(settings.VIENNA_DIR,'RNAcofold') + options + ' -T 37.0 -p < %s' % filename + ".fa", shell=True, stdout=subprocess.PIPE)
     else:
-        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAfold'), '-T','37.0', '-p', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
-    pair= p.communicate(input=input)[0]
-    p.wait()
+        subprocess.call(os.path.join(settings.VIENNA_DIR,'RNAfold') + options + ' -T 37.0 -p < %s' % filename + ".fa", shell=True, stdout=subprocess.PIPE)
 
     # get info from output file
     try:
-        file = open("dot.ps", "r")
+        file = open("%s_dp.ps" % filename, "r")
     except IOError:
-        print "Can't find dot.ps!"
+        print "Can't find %s_dp.ps!" % filename
         sys.exit()
 
     dotps = file.read()
     file.close()
-
+    os.remove(filename + ".fa")
+    os.remove(filename + "_dp.ps")
+    os.remove(filename + "_ss.ps")
 
     lines = re.findall('(\d+)\s+(\d+)\s+(\d*\.*\d*)\s+ubox',dotps)
 

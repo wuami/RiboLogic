@@ -123,17 +123,18 @@ def get_ensemble_scoring_func():
 
 class Scorer():
     def __init__(self, targets):
-        MS2 = []
-        for target in targets:
-            i = target['secstruct'].find('(((((.((....)))))))')
-            if i == -1:
-                MS2.append(False)
-            else:
-                MS2.append(True)
-                self.indices = [i, i+18]
-        self.MS2 = MS2
+        self.MS2 = []
+        self.indices = []
 
     def score(self, designs):
+        if not self.MS2:
+            for design in designs:
+                i = design['secstruct'].find('(((((.((....)))))))')
+                if i == -1:
+                    self.MS2.append(False)
+                else:
+                    self.MS2.append(True)
+                    self.indices = [i, i+18]
         score = 0.0
         for i,design in enumerate(designs):
             p = [pair for pair in design['dotplot'] if (pair[0] == self.indices[0] and pair[1] == self.indices[1])]

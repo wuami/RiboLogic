@@ -30,7 +30,7 @@ def main():
                 seq = line.split()[0]
                 for j, target in enumerate(puzzle.targets):
                     filename = "%s/images/%s_%s-%s.png" % (settings.PUZZLE_DIR, args.puzzleid, n_sequences, j)
-                    #draw_utils.draw_secstruct_state(v, target, puzzle.get_fold_sequence(seq, target), colormaps[j], filename)
+                    draw_utils.draw_secstruct_state(v, target, puzzle.get_fold_sequence(seq, target), colormaps[j], filename)
                 n_sequences += 1
     
     # create html to display images

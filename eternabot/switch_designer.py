@@ -11,7 +11,7 @@ import sys
 
 class SwitchDesigner(object):
 
-    def __init__(self, id, type, beginseq, constraints, targets, design_linker, scoring_func, inputs = None, mode = "ghost"):
+    def __init__(self, id, type, beginseq, constraints, targets, design_linker, scoring = "bpp", inputs = None, mode = "ghost"):
         # sequence information
         self.id = id
         self.type = type
@@ -22,7 +22,17 @@ class SwitchDesigner(object):
         self.index_array = self.get_unconstrained_indices()
 
         # scoring
-        self.scoring_func = scoring_func
+        if scoring == "bpp":
+            self.scoring_func = design_utils.get_bpp_scoring_func(targets)
+        elif scoring == "ensemble":
+            self.scoring_func = design_utils.get_ensemble_scoring_func()
+        elif scoring == "landing":
+            self.scoring_func = design_utils.get_strategy_scoring_func("eli_landing_lane")
+        elif scoring == "null":
+            self.scoring_func = None
+        else:
+            raise ValueError("invalid scoring function: %s" % scoring)
+
         #if type == "multi_input_oligo":
         self.bp_distance_func = design_utils.bp_distance_with_unpaired
         #else:
@@ -43,6 +53,7 @@ class SwitchDesigner(object):
             self.input_pos = [0]*(len(self.inputs)+1)
         self.linker_length = 5
         self.linker = ensemble_design.get_sequence_string(["C" if i % 5 == 2 else "A" for i in range(self.linker_length)])
+        self.free_linkers = True
         self.design_linker = design_linker#"CUUCUUCGC"#"GAAGAAGCG"#GUUUCACCCCUAAACACCAC"
         self.oligotail = ""#AUUGUUAGUUAGGUAAAAAA"
         if type == "multi_input" or type == "multi_input_oligo":
@@ -92,7 +103,10 @@ class SwitchDesigner(object):
                         fold_constraint += '.'*(self.input_pos[i+1]-self.input_pos[i])
                     if self.input_pos[i+1] - self.input_pos[i] != 0:
                         secstruct += '.'*len(self.design_linker)
-                        constrained += 'u'*len(self.design_linker)
+                        if self.free_linkers:
+                            constrained += 'o'*len(self.design_linker)
+                        else:
+                            constrained += 'u'*len(self.design_linker)
                         if self.mode == "ghost":
                             fold_constraint += '.'*len(self.design_linker)
                     # add input sequence
@@ -117,12 +131,18 @@ class SwitchDesigner(object):
                     # add linker sequence
                     if i != len(self.inputs)-1:
                         secstruct += '.'*self.linker_length
-                        constrained += 'u'*self.linker_length
+                        if self.free_linkers:
+                            constrained += 'o'*self.linker_length
+                        else:
+                            constrained += 'u'*self.linker_length
                         if self.mode == "ghost":
                             fold_constraint += '.'*self.linker_length
             if self.input_pos[-1] != len(target['secstruct']):
                 secstruct += '.'*len(self.design_linker)
-                constrained += 'u'*len(self.design_linker)
+                if self.free_linkers:
+                    constrained += 'o'*len(self.design_linker)
+                else:
+                    constrained += 'u'*len(self.design_linker)
                 if self.mode == "ghost":
                     fold_constraint += '.'*len(self.design_linker)
             # add last portion of sequence
@@ -166,11 +186,14 @@ class SwitchDesigner(object):
         """
         get indices for positions that can change)
         """
-        index_array = []
+        open = []
+        restricted = []
         for ii in range(0,self.n):
             if(self.constraints[ii] == "o"):
-                index_array.append(ii)
-        return index_array
+                open.append(ii)
+            elif self.constraints[ii] == "r":
+                restricted.append(ii)
+        return [open, restricted]
 
     def get_solution(self):
         """
@@ -220,6 +243,8 @@ class SwitchDesigner(object):
         # in a small number of cases, get_design function causes error
         # if this happens, assume 0 score
         try:
+            if not self.scoring_func:
+                return 0
             designs = []
             for i in range(self.n_targets):
                 if self.mode == "ghost":
@@ -330,9 +355,8 @@ class SwitchDesigner(object):
         """
         mut_array = ensemble_design.get_sequence_array(self.sequence)
         # mutate randomly wp 0.5, otherwise mutate oligo rc
-        if (random.random() > float(self.oligo_len[1]-self.oligo_len[0]+1)/len(self.index_array)):
-            rindex = self.index_array[int(random.random() * len(self.index_array))]
-            mut_array[rindex] = ensemble_design.get_random_base()
+        if (random.random() > float(self.oligo_len[1]-self.oligo_len[0]+1)/sum([len(x) for x in self.index_array])):
+            return self.mutate_sequence(sequence)
         else:
             ## wp 0.5 change length
             #if random.random() < 0.5:
@@ -340,8 +364,8 @@ class SwitchDesigner(object):
             # wp 0.5 expand
             if (random.random() < 0.5 or self.oligo_len[1]-self.oligo_len[0] <= 0) and \
                 self.oligo_len[1]-self.oligo_len[0] != len(self.oligo_rc)-1:
-                if (rindex or self.oligo_pos[0] == self.index_array[0] or self.oligo_len[0] == 0) and \
-                    self.oligo_pos[1] != self.index_array[-1] and self.oligo_len[1] != len(self.oligo_rc)-1 and\
+                if (rindex or self.oligo_pos[0] == min(self.index_array[0][0],self.index_array[1][0]) or self.oligo_len[0] == 0) and \
+                    self.oligo_pos[1] != max(self.index_array[0][-1],self.index_array[1][-1]) and self.oligo_len[1] != len(self.oligo_rc)-1 and\
                     self.constraints[self.oligo_pos[rindex]+1] != 'x':
                     self.oligo_pos[rindex] += 1
                     self.oligo_len[rindex] += 1
@@ -363,7 +387,10 @@ class SwitchDesigner(object):
     def mutate_sequence(self, sequence):
         """ mutate one random position """
         mut_array = ensemble_design.get_sequence_array(self.sequence)
-        rindex = self.index_array[int(random.random() * len(self.index_array))]
+        if random.random() < 0.9 or len(self.index_array[1]) == 0 and len(self.index_array[0]) != 0:
+            rindex = self.index_array[0][int(random.random() * len(self.index_array[0]))]
+        else:
+            rindex = self.index_array[1][int(random.random() * len(self.index_array[1]))]
         mut_array[rindex] = ensemble_design.get_random_base()
         return ensemble_design.get_sequence_string(mut_array)
 
@@ -378,7 +405,7 @@ class SwitchDesigner(object):
         bases = "GAUC"
         pairs = ["GC", "CG", "AU", "UA"]
     
-        if len(self.index_array) == 0:
+        if len(self.index_array[0]) == 0 and len(self.index_array[1]) == 0:
             return
 
         #print self.targets
@@ -404,10 +431,13 @@ class SwitchDesigner(object):
             #    self.all_solutions.append([mut_sequence, score])
             
             # if distance or score is better for mutant, update the current sequence
-            if(random.random() <= p_dist(self.bp_distance, bp_distance)):
-                score = self.get_design_score(fold_sequences, native)
+            #if(random.random() <= p_dist(self.bp_distance, bp_distance)):
+            if (bp_distance <= self.bp_distance):
+                score = max(self.get_design_score(fold_sequences, native),0)
+                if self.bp_distance <= bp_distance and self.design_score != 0 and random.random() > p_dist(self.design_score, score):
+                    continue
                 self.update_sequence(mut_sequence, native, bp_distance, score)
-                #print self.sequence, self.bp_distance
+                #print self.sequence, self.bp_distance, self.design_score
                 #for j in range(self.n_targets):
                 #    print self.native[j]
                 #    print self.get_fold_sequence(self.sequence, self.targets[j])

@@ -12,7 +12,7 @@ import settings
 import varna
 
     
-def read_puzzle_json(text, mode = "ghost", scoring = "bpp"):
+def read_puzzle_json(text, mode = "hairpin", scoring = "bpp"):
     """
     read in puzzle as a json file
     """
@@ -60,21 +60,12 @@ def read_puzzle_json(text, mode = "ghost", scoring = "bpp"):
         o['constrained'] = ensemble_design.get_sequence_string(constrained)
         secstruct.append(o)
 
-    if scoring == "bpp":
-        scoring_func = design_utils.get_bpp_scoring_func(secstruct)
-    elif scoring == "ensemble":
-        scoring_func = design_utils.get_ensemble_scoring_func()
-    elif scoring == "landing":
-        scoring_func = design_utils.get_strategy_scoring_func("eli_landing_lane")
-    else:
-        raise ValueError("invalid scoring function")
-
     if 'linker' not in p:
         p['linker'] = "AACAA"
 
     if p['rna_type'] == "multi_input" or p['rna_type'] == "multi_input_oligo":
-        return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring_func, p['inputs'], mode)
-    return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring_func, mode=mode)
+        return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, p['inputs'], mode)
+    return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, mode=mode)
 
 def optimize_n(puzzle, niter, ncool, n, submit, draw, fout):
     if fout:
@@ -177,11 +168,11 @@ def main():
     # parse arguments
     p = argparse.ArgumentParser()
     p.add_argument('puzzleid', help="name of puzzle filename or eterna id number", type=str)
-    p.add_argument('-s', '--nsol', help="number of solutions", type=int, default=1)
-    p.add_argument('-i', '--niter', help="number of iterations", type=int, default=1000)
+    p.add_argument('-n', '--nsol', help="number of solutions", type=int, default=1)
+    p.add_argument('-i', '--niter', help="number of iterations", type=int, default=2000)
     p.add_argument('-c', '--ncool', help="number of times to cool", type=int, default=50)
-    p.add_argument('-m', '--mode', help="mode for multi inputs", type=str, default="ghost")
-    p.add_argument('-o', '--score', help="scoring function", type=str, default="bpp")
+    p.add_argument('-m', '--mode', help="mode for multi inputs", type=str, default="hairpin")
+    p.add_argument('-s', '--score', help="scoring function", type=str, default="bpp")
     p.add_argument('--submit', help="submit the solution(s)", default=False, action='store_true')
     p.add_argument('--draw', help="draw the solution(s)", default=False, action='store_true')
     p.add_argument('--nowrite', help="suppress write to file", default=False, action='store_true')

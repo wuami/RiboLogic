@@ -36,9 +36,9 @@ def fold(seq, constraint=False):
         options = ""
         input = ''.join(seq)
     if '&' in seq:
-        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0', '-noPS', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     else:
-        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAfold'), '-T','37.0', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+        p = Popen([os.path.join(settings.VIENNA_DIR,'RNAfold'), '-T','37.0', '-noPS', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     pair= p.communicate(input=input)[0]
     p.wait()
 
