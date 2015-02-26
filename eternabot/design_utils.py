@@ -19,6 +19,9 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
     if(len(secstruct1) != len(secstruct2)):
         print "SS1 (%s) and SS2 (%s) lengths don't match" % (len(secstruct1), len(secstruct2))
         sys.exit(0)
+
+    if not threshold:
+        threshold = [[0,len(locks)-1,float('inf')]]
     
     # generate pair mappings
     pairmap1 = eterna_utils.get_pairmap_from_secstruct(secstruct1)
@@ -27,19 +30,25 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
     # +1 for each pair or single that doesn't match
     dist = 0
     udist = 0
-    for ii in range(0,len(locks)):
-        if(locks[ii] == "o"):
+    j = 0
+    for i in range(0,len(locks)):
+        if(locks[i] == "o"):
             continue
-        elif(locks[ii] == "u"):
-            if(secstruct1[ii] != secstruct2[ii]):
+        elif(locks[i] == "u"):
+            if(secstruct1[i] != secstruct2[i]):
                 udist += 1
         else:
-            if(pairmap1[ii] != pairmap2[ii]):
-                if(pairmap1[ii] > ii):
+            if(pairmap1[i] != pairmap2[i]):
+                if(pairmap1[i] > i):
                     dist += 1
-                if(pairmap2[ii] > ii):
+                if(pairmap2[i] > i):
                     dist += 1
-    return dist + max(0, udist-threshold)
+        if i == threshold[j][1]:
+            dist += min(threshold[j][2], udist)
+            udist = 0
+            if j != len(threshold)-1:
+                j += 1
+    return dist
 
 def bp_distance_with_constraint(secstruct1, secstruct2, locks):
     """

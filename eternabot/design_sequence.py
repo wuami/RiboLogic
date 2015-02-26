@@ -32,31 +32,28 @@ def read_puzzle_json(text, mode = "hairpin", scoring = "bpp"):
     secstruct = [] 
     for o in objective:
         n = len(o['secstruct'])
-        # if no constrained bases, all are unconstrained
-        if 'structure_constrained_bases' not in o.keys() and 'anti_structure_constrained_bases' not in o.keys():
-            constrained = ensemble_design.get_sequence_array('x'*n)
-        # otherwise, combine structure and antistructure constraints
-        else:
-            constrained = ensemble_design.get_sequence_array('o'*n)
-            struct = ensemble_design.get_sequence_array(o['secstruct'])
-            if 'structure_constrained_bases' in o.keys() and len(o['structure_constrained_bases']) > 0:
-                for i in range(0, len(o['structure_constrained_bases']), 2):
-                    [lo, hi] = o['structure_constrained_bases'][i:i+2]
-                    for j in range(lo, hi+1):
-                        constrained[j] = 'x'
-                del o['structure_constrained_bases']
-            if 'anti_structure_constrained_bases' in o.keys() and len(o['anti_structure_constrained_bases']) > 0:
-                [lo, hi] = o['anti_structure_constrained_bases']
-                for i in range(lo, hi+1):
-                    constrained[i] = 'x'
-                    struct[i] = '.'
-                del o['anti_secstruct'], o['anti_structure_constrained_bases']
-            if 'structure_unpaired_constrained_bases' in o.keys() and len(o['structure_unpaired_constrained_bases']) > 0:
-                [lo, hi] = o['structure_unpaired_constrained_bases']
-                for i in range(lo, hi+1):
-                    constrained[i] = 'u'
-                del o['structure_unpaired_constrained_bases']
-            o['secstruct'] = ensemble_design.get_sequence_string(struct)
+        constrained = ensemble_design.get_sequence_array('o'*n)
+        struct = ensemble_design.get_sequence_array(o['secstruct'])
+        if 'structure_constrained_bases' in o.keys() and len(o['structure_constrained_bases']) > 0:
+            for i in range(0, len(o['structure_constrained_bases']), 2):
+                [lo, hi] = o['structure_constrained_bases'][i:i+2]
+                for j in range(lo, hi+1):
+                    constrained[j] = 'x'
+            del o['structure_constrained_bases']
+        if 'anti_structure_constrained_bases' in o.keys() and len(o['anti_structure_constrained_bases']) > 0:
+            for i in range(0, len(o['anti_structure_constrained_bases']), 2):
+                [lo, hi] = o['anti_structure_constrained_bases'][i:i+2]
+                for j in range(lo, hi+1):
+                    constrained[j] = 'x'
+                    struct[j] = '.'
+            del o['anti_secstruct'], o['anti_structure_constrained_bases']
+        if 'structure_unpaired_constrained_bases' in o.keys() and len(o['structure_unpaired_constrained_bases']) > 0:
+            for i in range(0, len(o['structure_unpaired_constrained_bases']), 2):
+                [lo, hi] = o['structure_unpaired_constrained_bases'][i:i+2]
+                for j in range(lo, hi+1):
+                    constrained[j] = 'u'
+            del o['structure_unpaired_constrained_bases']
+        o['secstruct'] = ensemble_design.get_sequence_string(struct)
         o['constrained'] = ensemble_design.get_sequence_string(constrained)
         secstruct.append(o)
 

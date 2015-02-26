@@ -5,6 +5,7 @@ import settings
 import inv_utils
 import random
 import math
+import itertools
 import ensemble_design
 import unittest
 import sys
@@ -60,10 +61,11 @@ class SwitchDesigner(object):
             self.create_target_secstructs()
     
         # for debugging
-        #for i in targets:
-        #    print self.get_fold_sequence(self.sequence, i)
-        #    print i['secstruct']
-        #    print i['constrained']
+        self.debug = False
+        for i in targets:
+            print self.get_fold_sequence(self.sequence, i)
+            print i['secstruct']
+            print i['constrained']
 
         self.update_sequence(*self.get_sequence_info(self.sequence))
         
@@ -71,11 +73,11 @@ class SwitchDesigner(object):
         self.update_best()
         self.all_solutions = []
 
-        if type == "multi_input_oligo":
-            self.set_oligo_rc()
-            self.mutate_func = self.mutate_or_shift
-        else:
-            self.mutate_func = self.mutate_sequence
+        #if type == "multi_input_oligo":
+        #    self.set_oligo_rc()
+        #    self.mutate_func = self.mutate_or_shift
+        #else:
+        self.mutate_func = self.mutate_sequence
         
 
     def set_oligo_rc(self):
@@ -331,9 +333,11 @@ class SwitchDesigner(object):
         distance = 0
         for i in range(self.n_targets):
             if "threshold" in self.targets[i]:
-                distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'],     self.targets[i]['constrained'], self.targets[i]['threshold'])
+                distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'], self.targets[i]['threshold'])
             else:
                 distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'])
+            if self.debug:
+                print distance,
         return distance
 
     def check_secstructs(self, secstruct):
@@ -364,8 +368,10 @@ class SwitchDesigner(object):
             # wp 0.5 expand
             if (random.random() < 0.5 or self.oligo_len[1]-self.oligo_len[0] <= 0) and \
                 self.oligo_len[1]-self.oligo_len[0] != len(self.oligo_rc)-1:
-                if (rindex or self.oligo_pos[0] == min(self.index_array[0][0],self.index_array[1][0]) or self.oligo_len[0] == 0) and \
-                    self.oligo_pos[1] != max(self.index_array[0][-1],self.index_array[1][-1]) and self.oligo_len[1] != len(self.oligo_rc)-1 and\
+                min_index = min(list(itertools.chain(*self.index_array)))
+                max_index = max(list(itertools.chain(*self.index_array)))
+                if (rindex or self.oligo_pos[0] == min_index or self.oligo_len[0] == 0) and \
+                    self.oligo_pos[1] != max_index and self.oligo_len[1] != len(self.oligo_rc)-1 and\
                     self.constraints[self.oligo_pos[rindex]+1] != 'x':
                     self.oligo_pos[rindex] += 1
                     self.oligo_len[rindex] += 1
@@ -431,17 +437,16 @@ class SwitchDesigner(object):
             #    self.all_solutions.append([mut_sequence, score])
             
             # if distance or score is better for mutant, update the current sequence
-            #if(random.random() <= p_dist(self.bp_distance, bp_distance)):
-            if (bp_distance <= self.bp_distance):
+            if(random.random() <= p_dist(self.bp_distance, bp_distance)):
                 score = max(self.get_design_score(fold_sequences, native),0)
                 if self.bp_distance <= bp_distance and self.design_score != 0 and random.random() > p_dist(self.design_score, score):
                     continue
                 self.update_sequence(mut_sequence, native, bp_distance, score)
-                #print self.sequence, self.bp_distance, self.design_score
-                #for j in range(self.n_targets):
-                #    print self.native[j]
-                #    print self.get_fold_sequence(self.sequence, self.targets[j])
-                #print "\n"
+                if self.debug:
+                    print self.sequence, self.bp_distance, self.design_score
+                    for j in range(self.n_targets):
+                        print self.native[j]
+                        print self.get_fold_sequence(self.sequence, self.targets[j])
             
                 # if distance or score is better for mutant than best, update the best sequence    
                 if(bp_distance < self.best_bp_distance or
