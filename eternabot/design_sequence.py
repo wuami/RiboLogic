@@ -64,11 +64,7 @@ def read_puzzle_json(text, mode = "hairpin", scoring = "bpp"):
         return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, p['inputs'], mode)
     return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, mode=mode)
 
-def optimize_n(puzzle, niter, ncool, n, submit, draw, fout):
-    if fout:
-        with open(fout, 'a') as f:
-	        f.write("# %s iterations, %s coolings\n" % (niter, ncool))
-
+def optimize_n(puzzle, niter, ncool, n, submit, draw, fout, cotrans, prints, greedy):
     # run puzzle n times
     solutions = []
     scores = []
@@ -76,7 +72,7 @@ def optimize_n(puzzle, niter, ncool, n, submit, draw, fout):
     attempts = 0
     while i < n:
         puzzle.reset_sequence()
-        puzzle.optimize_sequence(niter, ncool)
+        puzzle.optimize_sequence(niter, ncool, greedy=greedy, cotrans=cotrans, prints=prints)
         if puzzle.check_current_secstructs():
             sol = puzzle.get_solution()
             if sol[0] not in solutions:
@@ -88,12 +84,19 @@ def optimize_n(puzzle, niter, ncool, n, submit, draw, fout):
                 if draw:
                     puzzle.draw_solution(i)
                 if fout:
+                    params = ""
+                    if greedy:
+                        params += "greedy "
+                    if cotrans:
+                        params += "cotranscriptional"
                     with open(fout, 'a') as f:
+                        f.write("# %s iterations, %s coolings, %s\n" % (niter, ncool, params))
                         f.write("%s\t%1.6f\n" % (sol[0], sol[2]))
                 i += 1
                 attempts = 0
         else:
             #niter += 500
+            print puzzle.best_bp_distance
             attempts += 1
             if attempts == 10:
                 break
@@ -173,6 +176,9 @@ def main():
     p.add_argument('--submit', help="submit the solution(s)", default=False, action='store_true')
     p.add_argument('--draw', help="draw the solution(s)", default=False, action='store_true')
     p.add_argument('--nowrite', help="suppress write to file", default=False, action='store_true')
+    p.add_argument('--cotrans', help="enable cotranscriptional folding", default=False, action='store_true')
+    p.add_argument('--prints', help="print sequences throughout optimization", default=False, action='store_true')
+    p.add_argument('--greedy', help="greedy search", default=False, action='store_true')
     args = p.parse_args()
 
     # read puzzle
@@ -182,15 +188,14 @@ def main():
     else:
         fout = False
     
-    #seq = "CUAUACAAUCUACUGUCUUUCUUUUUUAACUACAGCGUCUUUGUAAAACAUCCACCUUCUCAUGAGCAAUGGCGUCUAGCAUGAGGAUCACCCAUGUAGUUUAGGACGCAGAGCGAAGUACGUGCACCACAU"
-    #seq = "UUAAAUUCUAAAGAAGCAGCUGAAAUGACGUCGGUUUCUACAUGAGGAUCACCCAUGUUGACAAGGCGAGCACCUAU"
+    #seq = "UCUACUAAAGCGCACGACUAAUGCAUAUCCGUAAACAUGAGGAUCACCCAUGUGCACCUGGUCGAGCACCUAAAGUCUGCUGCUACUGGUUUAGUAUCAACAUUCACAAACAGUCAUGAUAU"
     #puzzle.update_sequence(seq)
     #puzzle.update_best()
-    #puzzle.draw_solution()
+    #puzzle.draw_solution("solution0")
     #view_sequence(puzzle, seq)
 
     # find solutions
-    [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, args.submit, args.draw, fout)
+    [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, args.submit, args.draw, fout, args.cotrans, args.prints, args.greedy)
 
 if __name__ == "__main__":
     #unittest.main()

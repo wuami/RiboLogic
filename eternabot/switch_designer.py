@@ -36,6 +36,7 @@ class SwitchDesigner(object):
 
         #if type == "multi_input_oligo":
         self.bp_distance_func = design_utils.bp_distance_with_unpaired
+        self.greedy = False
         #else:
         #    self.bp_distance_func = design_utils.bp_distance_with_constraint
         self.mode = mode
@@ -55,13 +56,14 @@ class SwitchDesigner(object):
         self.linker_length = 5
         self.linker = ensemble_design.get_sequence_string(["C" if i % 5 == 2 else "A" for i in range(self.linker_length)])
         self.free_linkers = True
-        self.design_linker = design_linker#"CUUCUUCGC"#"GAAGAAGCG"#GUUUCACCCCUAAACACCAC"
-        self.oligotail = ""#AUUGUUAGUUAGGUAAAAAA"
+        self.design_linker = design_linker
+        self.oligotail = ""
         if type == "multi_input" or type == "multi_input_oligo":
             self.create_target_secstructs()
+        self.cotrans = False
     
-        # for debugging
-        self.debug = False
+        # print puzzle info
+        self.prints = False
         for i in targets:
             print self.get_fold_sequence(self.sequence, i)
             print i['secstruct']
@@ -115,7 +117,7 @@ class SwitchDesigner(object):
                     seq = self.inputs[input]
                     if input in target['inputs']:
                         if self.mode == "hairpin":
-                            hairpin_len = (len(seq)-5)/2
+                            hairpin_len = (len(seq)-4)/2
                             if self.hp_mismatch:
                                 mismatch = hairpin_len/2
                                 secstruct += '('*(mismatch-1)+'.'+'('*(hairpin_len-mismatch) + '.'*(len(seq)-2*hairpin_len) + ')'*(hairpin_len-mismatch) + '.' + ')'*(mismatch-1)
@@ -124,7 +126,7 @@ class SwitchDesigner(object):
                         elif self.mode == "ghost":
                             secstruct += '.'*len(seq)
                             fold_constraint += 'x'*len(seq)
-                        constrained += 'u'*len(seq)
+                        constrained += 'x'*len(seq)
                     else:
                         secstruct += '.'*len(seq)
                         constrained += 'o'*len(seq)
@@ -205,9 +207,9 @@ class SwitchDesigner(object):
             fold_sequence = self.get_fold_sequence(self.best_sequence, self.targets[i])
             print fold_sequence
             if self.mode == "ghost":
-                print inv_utils.fold(fold_sequence, self.targets[i]['fold_constraint'])[0]
+                print inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
             else:
-                print inv_utils.fold(fold_sequence)[0]
+                print inv_utils.fold(fold_sequence, self.cotrans)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
 
     def draw_solution(self, name):
@@ -217,12 +219,12 @@ class SwitchDesigner(object):
         
         # get puzzle object and generate colormaps for each objective
         n = len(self.inputs)
-        colormaps = draw_utils.get_colormaps(self.targets, self.inputs, self.n, self.linker_length, self.design_linker, n)
+        colormap = draw_utils.get_colormaps(self.targets, self.inputs, self.input_pos, self.n, self.linker_length, self.design_linker, n)
         
         # draw image for each condition
         for i, target in enumerate(self.targets):
             filename = "%s/images/%s_%s-%s.png" % (settings.PUZZLE_DIR, self.id, name, i)
-            draw_utils.draw_secstruct_state(v, target, self.get_fold_sequence(self.sequence, target), colormaps[i], filename)
+            draw_utils.draw_secstruct_state(v, target, self.get_fold_sequence(self.sequence, target), colormap, filename)
 
     def get_solutions(self):
         """
@@ -260,7 +262,7 @@ class SwitchDesigner(object):
 
     def get_hairpin(self, seq, begin, mismatch):
         """ turn sequence into hairpin """
-        n = (len(seq)-5)/2
+        n = (len(seq)-4)/2
         if begin:
             hairpin = seq[0:n] + seq[n:len(seq)-n] + design_utils.rc(seq[0:n])
             i = -n/2
@@ -284,9 +286,9 @@ class SwitchDesigner(object):
             fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
             fold_sequences.append(fold_sequence)
             if self.mode == "ghost":
-                fold = inv_utils.fold(fold_sequence, self.targets[i]['fold_constraint'])[0]
+                fold = inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
             else:
-                fold = inv_utils.fold(fold_sequence)[0]
+                fold = inv_utils.fold(fold_sequence, self.cotrans)[0]
             native.append(fold)
         bp_distance = self.score_secstructs(native)
         return [sequence, native, bp_distance, fold_sequences]
@@ -336,7 +338,7 @@ class SwitchDesigner(object):
                 distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'], self.targets[i]['threshold'])
             else:
                 distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'])
-            if self.debug:
+            if self.prints:
                 print distance,
         return distance
 
@@ -400,7 +402,7 @@ class SwitchDesigner(object):
         mut_array[rindex] = ensemble_design.get_random_base()
         return ensemble_design.get_sequence_string(mut_array)
 
-    def optimize_sequence(self, n_iterations, n_cool):
+    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, prints = None):
         """
         monte-carlo optimization of the sequence
 
@@ -414,6 +416,13 @@ class SwitchDesigner(object):
         if len(self.index_array[0]) == 0 and len(self.index_array[1]) == 0:
             return
 
+        if greedy != None:
+            self.greedy = greedy
+        if cotrans != None:
+            self.cotrans = cotrans
+        if prints != None:
+            self.prints = prints
+
         #print self.targets
         #self.optimize_start_sequence()
 
@@ -422,6 +431,12 @@ class SwitchDesigner(object):
         def p_dist(dist, new_dist):
             """probability function"""
             return math.exp(-(new_dist-dist)/T)
+
+        def p_greedy(dist, new_dist):
+            if new_dist <= dist:
+                return 1
+            else:
+                return 0
 
         # loop as long as bp distance too large or design score too small
         for i in range(n_iterations):
@@ -437,16 +452,20 @@ class SwitchDesigner(object):
             #    self.all_solutions.append([mut_sequence, score])
             
             # if distance or score is better for mutant, update the current sequence
-            if(random.random() <= p_dist(self.bp_distance, bp_distance)):
+            if self.greedy:
+                p = p_greedy(self.bp_distance, bp_distance)
+            else:
+                p = p_dist(self.bp_distance, bp_distance)
+            if(random.random() <= p):
                 score = max(self.get_design_score(fold_sequences, native),0)
-                if self.bp_distance <= bp_distance and self.design_score != 0 and random.random() > p_dist(self.design_score, score):
+                if self.bp_distance == bp_distance and self.design_score != 0 and random.random() > p_dist(self.design_score, score):
                     continue
                 self.update_sequence(mut_sequence, native, bp_distance, score)
-                if self.debug:
+                if self.prints:
                     print self.sequence, self.bp_distance, self.design_score
                     for j in range(self.n_targets):
                         print self.native[j]
-                        print self.get_fold_sequence(self.sequence, self.targets[j])
+                        #print self.get_fold_sequence(self.sequence, self.targets[j])
             
                 # if distance or score is better for mutant than best, update the best sequence    
                 if(bp_distance < self.best_bp_distance or

@@ -21,7 +21,7 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
         sys.exit(0)
 
     if not threshold:
-        threshold = [[0,len(locks)-1,float('inf')]]
+        threshold = [[0,len(locks)-1,locks.count("u")]]
     
     # generate pair mappings
     pairmap1 = eterna_utils.get_pairmap_from_secstruct(secstruct1)
@@ -29,14 +29,14 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
     
     # +1 for each pair or single that doesn't match
     dist = 0
-    udist = 0
+    umatch = 0
     j = 0
     for i in range(0,len(locks)):
         if(locks[i] == "o"):
             continue
         elif(locks[i] == "u"):
-            if(secstruct1[i] != secstruct2[i]):
-                udist += 1
+            if(secstruct1[i] == secstruct2[i]):
+                umatch += 1
         else:
             if(pairmap1[i] != pairmap2[i]):
                 if(pairmap1[i] > i):
@@ -44,7 +44,7 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
                 if(pairmap2[i] > i):
                     dist += 1
         if i == threshold[j][1]:
-            dist += min(threshold[j][2], udist)
+            dist += max(threshold[j][2]-umatch, 0)
             udist = 0
             if j != len(threshold)-1:
                 j += 1
@@ -134,16 +134,15 @@ class Scorer():
     def __init__(self, targets):
         self.MS2 = []
         self.indices = []
+        for target in targets:
+            i = target['secstruct'].find('(((((.((....)))))))')
+            if i == -1:
+                self.MS2.append(False)
+            else:
+                self.MS2.append(True)
+                self.indices = [i, i+18]
 
     def score(self, designs):
-        if not self.MS2:
-            for design in designs:
-                i = design['secstruct'].find('(((((.((....)))))))')
-                if i == -1:
-                    self.MS2.append(False)
-                else:
-                    self.MS2.append(True)
-                    self.indices = [i, i+18]
         score = 0.0
         for i,design in enumerate(designs):
             p = [pair for pair in design['dotplot'] if (pair[0] == self.indices[0] and pair[1] == self.indices[1])]

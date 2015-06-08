@@ -18,7 +18,7 @@ BASES = ['A','U','G','C']
 #@param seq:sequence
 #@return: [parenthesis notation, energy]
 
-def fold(seq, constraint=False):
+def fold(seq, cotransc=False, constraint=False):
     """
     folds sequence using Vienna
 
@@ -35,7 +35,9 @@ def fold(seq, constraint=False):
     else:
         options = ""
         input = ''.join(seq)
-    if '&' in seq:
+    if cotransc:
+        p = Popen([os.path.join(settings.VIENNA_DIR,'CoFold'), '--distAlpha', '0.5', '--distTau', '640', '--noPS', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    elif '&' in seq:
         p = Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0', '-noPS', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     else:
         p = Popen([os.path.join(settings.VIENNA_DIR,'RNAfold'), '-T','37.0', '-noPS', options], stdout=PIPE, stdin=PIPE, stderr=STDOUT)

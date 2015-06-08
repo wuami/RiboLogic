@@ -51,7 +51,7 @@ class Varna(object):
         #subprocess.call(self.varna_command + " -sequenceDBN " + sequence_str + " -structureDBN \"" + sstructure_str + "\" -o " + filename + " -colorMap \"" + colormap_str + "\" -colorMapStyle " + colormapstyle +  " -bp \"#000000\" -periodNum 10 -spaceBetweenBases 0.7", 
         #   shell=True)
 
-        command = self.varna_command + " -sequenceDBN " + sequence_str + " -structureDBN \"" + sstructure_str + "\" -o " + filename + " -colorMap \"" + colormap_str + "\" -flat false -spaceBetweenBases 0.5"
+        command = self.varna_command + " -sequenceDBN " + sequence_str + " -structureDBN \"" + sstructure_str + "\" -o " + filename + " -resolution 2.0 -colorMap \"" + colormap_str + "\" -flat false -spaceBetweenBases 0.5"
         if highlight_region:
             command += " -highlightRegion \"" + highlight_region + "\""
         subprocess.call(command, shell=True)
