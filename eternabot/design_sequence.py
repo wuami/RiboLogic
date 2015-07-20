@@ -116,7 +116,8 @@ def get_puzzle_from_server(id, mode, scoring):
     """
     get puzzle with id number id from eterna server
     """
-    r = requests.get('http://nando.eternadev.org/get/?type=puzzle&nid=%s' % id)
+    #r = requests.get('http://nando.eternadev.org/get/?type=puzzle&nid=%s' % id)
+    r = requests.get('http://eternagame.org/get/?type=puzzle&nid=%s' % id)
     return read_puzzle_json(r.text, mode, scoring)
 
 def post_solutions(puzzleid, filename, mode):

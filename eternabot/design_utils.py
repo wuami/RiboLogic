@@ -103,6 +103,13 @@ def get_different_base(base):
         randn = int(math.floor(random.random() * 4) % 4)
     return bases[randn]
 
+def satisfies_constraints(sequence, beginseq, constraints):
+    for i,letter in enumerate(constraints):
+        if letter == "o":
+            continue
+        if beginseq[i] != sequence[i]:
+            return False
+    return True
 
 def convert_sequence_constraints(sequence, constraints):
     """

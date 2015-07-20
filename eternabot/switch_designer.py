@@ -9,6 +9,7 @@ import itertools
 import ensemble_design
 import unittest
 import sys
+import networkx as nx
 
 class SwitchDesigner(object):
 
@@ -45,6 +46,7 @@ class SwitchDesigner(object):
 
         # target information
         self.targets = targets
+        self.dep_graph = self.get_dependency_graph()
         self.n_targets = len(self.targets)
         self.inputs = inputs
         if "pos" in self.inputs:
@@ -81,6 +83,18 @@ class SwitchDesigner(object):
         #else:
         self.mutate_func = self.mutate_sequence
         
+    def get_dependency_graph(self):
+        """ get dependency graph based on target secondary structures """
+        graph = nx.Graph()
+        graph.add_nodes_from(range(self.n))
+        for target in self.targets:
+            pairmap = eterna_utils.get_pairmap_from_secstruct(target['secstruct'])
+            for i, j in enumerate(pairmap):
+                if j > i:
+                    graph.add_edge(i,j)
+        if not nx.is_bipartite(graph):
+            raise ValueError("dependency graph is not bipartite")
+        return graph
 
     def set_oligo_rc(self):
         """ set oligo rc parameters for shifting complement sequece"""
@@ -394,13 +408,26 @@ class SwitchDesigner(object):
 
     def mutate_sequence(self, sequence):
         """ mutate one random position """
-        mut_array = ensemble_design.get_sequence_array(self.sequence)
-        if random.random() < 0.9 or len(self.index_array[1]) == 0 and len(self.index_array[0]) != 0:
-            rindex = self.index_array[0][int(random.random() * len(self.index_array[0]))]
-        else:
-            rindex = self.index_array[1][int(random.random() * len(self.index_array[1]))]
-        mut_array[rindex] = ensemble_design.get_random_base()
+        while True:
+            mut_array = ensemble_design.get_sequence_array(self.sequence)
+            if random.random() < 0.9 or len(self.index_array[1]) == 0 and len(self.index_array[0]) != 0:
+                rindex = self.index_array[0][int(random.random() * len(self.index_array[0]))]
+            else:
+                rindex = self.index_array[1][int(random.random() * len(self.index_array[1]))]
+            rbase = ensemble_design.get_random_base()
+            mut_array[rindex] = rbase
+            self.update_neighbors(rindex, mut_array, [])
+            if design_utils.satisfies_constraints(mut_array, self.beginseq, self.constraints):
+                break
         return ensemble_design.get_sequence_string(mut_array)
+
+    def update_neighbors(self, node, mut_array, updated):
+        complement = design_utils.rc(mut_array[node])
+        for pos in nx.all_neighbors(self.dep_graph, node):
+            mut_array[pos] = complement
+            if pos not in updated:
+                updated.append(pos)
+                self.update_neighbors(pos, mut_array)
 
     def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, prints = None):
         """
