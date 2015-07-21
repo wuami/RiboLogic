@@ -46,7 +46,6 @@ class SwitchDesigner(object):
 
         # target information
         self.targets = targets
-        self.dep_graph = self.get_dependency_graph()
         self.n_targets = len(self.targets)
         self.inputs = inputs
         if "pos" in self.inputs:
@@ -60,10 +59,19 @@ class SwitchDesigner(object):
         self.free_linkers = True
         self.design_linker = design_linker
         self.oligotail = ""
+        
+        # update dependency graph
+        self.dep_graph = self.get_dependency_graph()
+        seq_array = ensemble_design.get_sequence_array(self.sequence)
+        for i in range(self.n):
+            if self.constraints[i] == "x":
+                self.update_neighbors(i, seq_array, [])
+        self.sequence = ensemble_design.get_sequence_string(self.sequence)
+
         if type == "multi_input" or type == "multi_input_oligo":
             self.create_target_secstructs()
         self.cotrans = False
-    
+        
         # print puzzle info
         self.prints = False
         for i in targets:
@@ -155,19 +163,19 @@ class SwitchDesigner(object):
                             constrained += 'u'*self.linker_length
                         if self.mode == "ghost":
                             fold_constraint += '.'*self.linker_length
-            if self.input_pos[-1] != len(target['secstruct']):
-                secstruct += '.'*len(self.design_linker)
-                if self.free_linkers:
-                    constrained += 'o'*len(self.design_linker)
-                else:
-                    constrained += 'u'*len(self.design_linker)
+                if self.input_pos[-1] != len(target['secstruct']):
+                    secstruct += '.'*len(self.design_linker)
+                    if self.free_linkers:
+                        constrained += 'o'*len(self.design_linker)
+                    else:
+                        constrained += 'u'*len(self.design_linker)
+                    if self.mode == "ghost":
+                        fold_constraint += '.'*len(self.design_linker)
+                # add last portion of sequence
+                target['secstruct'] = secstruct + target['secstruct'][self.input_pos[-1]:]
+                target['constrained'] = constrained + target['constrained'][self.input_pos[-1]:]
                 if self.mode == "ghost":
-                    fold_constraint += '.'*len(self.design_linker)
-            # add last portion of sequence
-            target['secstruct'] = secstruct + target['secstruct'][self.input_pos[-1]:]
-            target['constrained'] = constrained + target['constrained'][self.input_pos[-1]:]
-            if self.mode == "ghost":
-                target['fold_constraint'] = fold_constraint + '.'*(self.n-self.input_pos[-1])
+                    target['fold_constraint'] = fold_constraint + '.'*(self.n-self.input_pos[-1])
 
     def get_fold_sequence(self, sequence, objective):
         """ append oligo sequences separated by & for type oligo """
@@ -427,7 +435,7 @@ class SwitchDesigner(object):
             mut_array[pos] = complement
             if pos not in updated:
                 updated.append(pos)
-                self.update_neighbors(pos, mut_array)
+                self.update_neighbors(pos, mut_array, updated)
 
     def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, prints = None):
         """
