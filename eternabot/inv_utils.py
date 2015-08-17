@@ -51,6 +51,75 @@ def fold(seq, cotransc=False, constraint=False):
     ret.append(toks[2][1:-1])
     return ret
 
+def nupack_fold(seq, bpp = False):
+    """
+    folds sequence using nupack
+    """
+    split = seq.split("&")
+    f = open("temp.in", "w")
+    f.write("%s\n" % len(split))
+    for seq in split:
+        f.write("%s\n" % seq)
+    f.write("%s\n" % len(split))
+    f.close()
+    options = ['-material', 'rna1999', '-ordered', '-quiet', '-mfe']
+    if bpp:
+        options.append('-pairs')
+    if not call([os.path.join(settings.NUPACK_DIR,'complexes')] + options + ['temp']):
+        # get strand ordering
+        strands_dict = {}
+        with open("temp.ocx-key") as f_key:
+            for line in f_key:
+                if not line.startswith("%"):
+                    spl = line.strip().split("\t")
+                    strands_dict[(spl[0], spl[1])] = spl[2:]
+        # get mfe structure
+        with open("temp.ocx-mfe") as f_mfe:
+            best_complex = -1
+            best_strands = []
+            best_mfe = float("inf")
+            best_fold = ""
+            line = f_mfe.readline()
+            while line:
+                if line.startswith("% complex"):
+                    m = re.search(r"complex([0-9]+)-order([0-9]+)", line)
+                    complex = (m.group(1), m.group(2))
+                    strands = strands_dict[complex]
+                    if len(strands) == len(set(strands)) and len(strands) == len(split):
+                        f_mfe.readline()
+                        energy = float(f_mfe.readline().strip())
+                        if energy < best_mfe:
+                            best_complex = complex
+                            best_strands = [int(x) for x in strands]
+                            best_mfe = energy
+                            best_fold = f_mfe.readline().strip()
+                line = f_mfe.readline()
+
+        if bpp:
+            bpp_matrix = []
+            with open("temp.cx-epairs") as f_pairs:
+                line = f_pairs.readline()
+                while line:
+                    if line.startswith("% complex%s" % complex[0]):
+                        f_pairs.readline()
+                        line = f_pairs.readline()
+                        while not line.startswith("%"):
+                            bpp_matrix.append(line.strip().split())
+                        return bpp_matrix
+
+        # get secondary structures in order
+        secstructs = best_fold.split("+")
+        folds = []
+        for i in range(1, len(split)+1):
+            if i in best_strands:
+                folds.append(secstructs[best_strands.index(i)])
+            else:
+                folds.append("."*len(split[i-1]))
+        return ["&".join(folds), best_mfe]
+
+    else:
+        raise ValueError("nupack complexes command failed")
+
 def fill_gc(elem , pair_map , seq, rand ):
     if(elem.type_ != eterna_utils.RNAELEMENT_STACK):
         return

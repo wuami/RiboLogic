@@ -6,7 +6,7 @@ var sid, dbgwin, dbgdoc;
 var dbg = false;
 
 if (dbg) {
-  sid = "3387609";
+  sid = "3387835";
   dbgwin = window.open("","EternaScript_"+sid,"width=400,height=800,toolbar=no,location=no,directories=no,status=no,menubar=no,scrollbars=yes,resizable=yes");
   dbgdoc = dbgwin.document;
 
@@ -24,44 +24,29 @@ var dbg_out = function(txt, elemtype) {
 
 // -------------------------------------------------------------
 
-var applet = document.getElementById('maingame');
-if (applet == null) return "maingame element missing";
 
-var seq = applet.get_sequence_string();
-// console.log(seq);
-//dbg_out(seq, "div");
+String.prototype.repeat = function (num) {
+  var a = [];
+  a.length = (num << 0) + 1;
+  return a.join(this);
+};
 
-var locks = applet.get_locks();
-// console.log(locks);
-//dbg_out(locks.toString(), "div");
+seed = 3;
+seededRandom = function(min, max) {
+    max = max || 1;
+    min = min || 0;
 
-var targets = applet.get_targets();
-// console.log(targets);
-//dbg_out(JSON.stringify(targets, undefined, 2), "pre");
-
-var constraints = applet.get_constraints();
-// console.log(constraints);
-//dbg_out(JSON.stringify(constraints, undefined, 2), "pre");
-
-applet.set_script_status("wait for input");
-var niter = prompt("How many iterations would you like to run?", 100);
-if (niter === null) return "cancelled";
-niter = parseInt(niter,10);
-if (isNaN(niter) || niter <= 0) return "invalid input";
-
-var index_array = new Array(); 
-for ( i = 0; i < locks.length; i++ ) {
-    if (!locks[i]) {
-        index_array.push(i);
-    }
+    seed = (seed * 9301 + 49297) % 233280;
+    var rnd = seed / 233280;
+	return min + rnd * (max - min);
 }
 
 function random_base() {
-    return Lib.bases[Math.floor(Math.random() * 4)];
+    return Lib.bases[Math.floor(seededRandom(0,4))];
 }
 
 function mutate(sequence) {
-    var rindex = index_array[Math.floor(Math.random() * index_array.length)];
+    var rindex = index_array[Math.floor(seededRandom(0,index_array.length))];
     var seq_array = sequence.split("");
     seq_array[rindex] = random_base();
   	return seq_array.join("");
@@ -105,12 +90,14 @@ function score_sequence(sequence) {
         target = targets[ii];
         if (target['type'] == "single") {
             var secstruct = applet.fold(sequence);
+            dbg_out(target['secstruct'], "div");
+            dbg_out(secstruct, "div");
             score += bp_distance(target['secstruct'],secstruct);
         } else if (target['type'] == "oligo") {
             var secstruct = applet.fold(target['oligo_sequence'] + sequence);
             score += bp_distance(target['secstruct'],secstruct,target['structure_constraints']);
             if ('anti_secstruct' in target) {
-                score += bp_distance(Array(target['anti_secstruct'].length).join("."),secstruct,target['anti_structure_constraints']);
+                score += bp_distance(".".repeat(target['anti_secstruct'].length),secstruct,target['anti_structure_constraints']);
             }
         }
     }
@@ -119,7 +106,39 @@ function score_sequence(sequence) {
 
 
 function prob(dist, new_dist) {
+    dbg_out(dist-new_dist, "div");
     return Math.exp(-(new_dist-dist));
+}
+
+// -------------------------------------------------------------
+
+var applet = document.getElementById('maingame');
+if (applet == null) return "maingame element missing";
+
+var seq = applet.get_sequence_string();
+// console.log(seq);
+//dbg_out(seq, "div");
+
+var locks = applet.get_locks();
+// console.log(locks);
+//dbg_out(locks.toString(), "div");
+
+var targets = applet.get_targets();
+// console.log(targets);
+//dbg_out(JSON.stringify(targets, undefined, 2), "pre");
+
+applet.set_script_status("wait for input");
+var niter = prompt("How many iterations would you like to run?", 1000);
+if (niter === null) return "cancelled";
+niter = parseInt(niter,10);
+if (isNaN(niter) || niter <= 0) return "invalid input";
+applet.set_script_status("running");
+
+var index_array = new Array(); 
+for ( i = 0; i < locks.length; i++ ) {
+    if (!locks[i]) {
+        index_array.push(i);
+    }
 }
 
 var current_seq = seq;
@@ -130,14 +149,15 @@ var mut_seq;
 var mut_dist;
 var i = 0;
 for ( ; i < niter; i++ ) {
+    if (i % 100 == 0) global_timer = new Date();
     mut_seq = mutate(current_seq);
     mut_dist = score_sequence(mut_seq);
-    if (Math.random() <= prob(current_dist, mut_dist)) {
+    if (seededRandom() <= prob(current_dist, mut_dist)) {
         current_seq = mut_seq;
         dbg_out(current_seq, "div");
         current_dist = mut_dist;
         dbg_out(current_dist, "div");
-        if (current_dist < best_dist) {
+        if (current_dist <= best_dist) {
             best_seq = current_seq;
             best_dist = current_dist;
             if (current_dist == 0) {
@@ -147,6 +167,7 @@ for ( ; i < niter; i++ ) {
     }
 }
 dbg_out(best_seq, "div");
+dbg_out(best_dist, "div");
 
 var ok = applet.set_sequence_string(best_seq);
 dbg_out("mutation " + (ok? "succeeded" : "FAILED")  , "div");

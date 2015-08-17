@@ -54,11 +54,6 @@ class SwitchDesigner(object):
             del self.inputs['pos']
         else:
             self.input_pos = [0]*(len(self.inputs)+1)
-        self.linker_length = 5
-        self.linker = ensemble_design.get_sequence_string(["C" if i % 5 == 2 else "A" for i in range(self.linker_length)])
-        self.free_linkers = True
-        self.design_linker = design_linker
-        self.oligotail = ""
         
         # update dependency graph
         self.dep_graph = self.get_dependency_graph()
@@ -68,6 +63,16 @@ class SwitchDesigner(object):
                 self.update_neighbors(i, seq_array, [])
         self.sequence = ensemble_design.get_sequence_string(self.sequence)
 
+        if mode == "nupack":
+            self.linker_length = 0
+            self.linker = ""
+            self.design_linker = ""
+        else:
+            self.linker_length = 5
+            self.linker = ensemble_design.get_sequence_string(["C" if i % 5 == 2 else "A" for i in range(self.linker_length)])
+            self.free_linkers = True
+            self.design_linker = design_linker
+            self.oligotail = ""
         if type == "multi_input" or type == "multi_input_oligo":
             self.create_target_secstructs()
         self.cotrans = False
@@ -138,6 +143,7 @@ class SwitchDesigner(object):
                     # add input sequence
                     seq = self.inputs[input]
                     if input in target['inputs']:
+                        constrained += 'x'*len(seq)
                         if self.mode == "hairpin":
                             hairpin_len = (len(seq)-4)/2
                             if self.hp_mismatch:
@@ -148,14 +154,16 @@ class SwitchDesigner(object):
                         elif self.mode == "ghost":
                             secstruct += '.'*len(seq)
                             fold_constraint += 'x'*len(seq)
-                        constrained += 'x'*len(seq)
-                    else:
+                        elif self.mode == "nupack":
+                            secstruct += '.'*len(seq) + '&'
+                            constrained += '&'
+                    elif self.mode != "nupack":
                         secstruct += '.'*len(seq)
                         constrained += 'o'*len(seq)
                         if self.mode == "ghost":
                             fold_constraint += '.'*len(seq)
                     # add linker sequence
-                    if i != len(self.inputs)-1:
+                    if self.mode != "nupack" and i != len(self.inputs)-1:
                         secstruct += '.'*self.linker_length
                         if self.free_linkers:
                             constrained += 'o'*self.linker_length
@@ -163,7 +171,7 @@ class SwitchDesigner(object):
                             constrained += 'u'*self.linker_length
                         if self.mode == "ghost":
                             fold_constraint += '.'*self.linker_length
-                if self.input_pos[-1] != len(target['secstruct']):
+                if self.mode != "nupack" and self.input_pos[-1] != len(target['secstruct']):
                     secstruct += '.'*len(self.design_linker)
                     if self.free_linkers:
                         constrained += 'o'*len(self.design_linker)
@@ -182,6 +190,8 @@ class SwitchDesigner(object):
         if objective['type'] == 'oligo':
             return '&'.join([sequence, objective['oligo_sequence']])
         elif objective['type'] == 'oligos':
+            if self.mode == "nupack":
+                return '&'.join([self.inputs[x] for x in objective['inputs']] + [sequence])
             # get positions of inputs
             fold_seq = ""
             for i,input in enumerate(sorted(self.inputs)):
@@ -230,8 +240,10 @@ class SwitchDesigner(object):
             print fold_sequence
             if self.mode == "ghost":
                 print inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
-            else:
+            elif self.mode == "hairpin":
                 print inv_utils.fold(fold_sequence, self.cotrans)[0]
+            else:
+                print inv_utils.nupack_fold(fold_sequence)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
 
     def draw_solution(self, name):
@@ -275,6 +287,8 @@ class SwitchDesigner(object):
             for i in range(self.n_targets):
                 if self.mode == "ghost":
                     designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i], self.targets[i]['fold_constraint']))
+                elif self.mode == "nupack":
+                    designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i], nupack=True))
                 else:
                     designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i]))
             score = self.scoring_func(designs)
@@ -309,8 +323,10 @@ class SwitchDesigner(object):
             fold_sequences.append(fold_sequence)
             if self.mode == "ghost":
                 fold = inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
-            else:
+            elif self.mode == "hairpin":
                 fold = inv_utils.fold(fold_sequence, self.cotrans)[0]
+            else:
+                fold = inv_utils.nupack_fold(fold_sequence)[0]
             native.append(fold)
         bp_distance = self.score_secstructs(native)
         return [sequence, native, bp_distance, fold_sequences]

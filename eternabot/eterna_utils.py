@@ -155,6 +155,7 @@ def get_pairmap_from_secstruct(secstruct):
     dictionary with pair mappings
     """
     pair_stack = []
+    end_stack = []
     pairs_array = []
     i_range = range(0,len(secstruct))
 
@@ -167,9 +168,19 @@ def get_pairmap_from_secstruct(secstruct):
         if(secstruct[ii] == "("):
             pair_stack.append(ii)
         elif(secstruct[ii] == ")"):
-            index = pair_stack.pop()
-            pairs_array[index] = ii
-            pairs_array[ii] = index
+            if not pair_stack:
+                end_stack.append(ii)
+            else:
+                index = pair_stack.pop()
+                pairs_array[index] = ii
+                pairs_array[ii] = index
+    if len(pair_stack) == len(end_stack):
+        n = len(pair_stack)
+        for ii in range(n):
+            pairs_array[pair_stack[ii]] = end_stack[-ii]
+            pairs_array[end_stack[-ii]] = pair_stack[ii]
+    else:
+         print "ERROR: pairing incorrect %s" % secstruct
 
     return pairs_array
 
@@ -440,8 +451,10 @@ def fill_energy(elements,sequence,pairmap):
             elements[ii].score_ = total_energy / 100.0
 
 
-def get_dotplot(sequence, constraint=False):
+def get_dotplot(sequence, nupack=False, constraint=False):
     """ run ViennaRNA to get bp probability matrix """
+    if nupack:
+        return inv_utils.nupack_fold(sequence, bpp=True)
     filename = "".join(random.sample(string.lowercase,5))
     with open(filename+".fa",'w') as f:
         f.write(">%s\n" % filename)
@@ -586,7 +599,7 @@ def fill_design(design):
         design['secstruct'] = "....." + design['secstruct'] + "...................."
     design['secstruct_elements'] = get_rna_elements_from_secstruct(design['secstruct'])
     design['pairmap'] = get_pairmap_from_secstruct(design['secstruct'])
-    design['dotplot'] = get_dotplot(design['sequence'])
+    #design['dotplot'] = get_dotplot(design['sequence'])
 
     fill_energy(design['secstruct_elements'],design['sequence'],design['pairmap'])
     elements = design['secstruct_elements']
@@ -600,7 +613,7 @@ def fill_design(design):
         print "CALCULATED : " + str(total_energy)
 
 
-def get_design_from_sequence(sequence,secstruct,constraint = False):
+def get_design_from_sequence(sequence,secstruct,nupack=False,constraint = False):
     """
     get the design dict of the sequence
 
@@ -642,7 +655,7 @@ def get_design_from_sequence(sequence,secstruct,constraint = False):
     design['ua'] = au_count
     design['secstruct_elements'] = get_rna_elements_from_secstruct(design['secstruct'])
 
-    design['dotplot'] = get_dotplot(design['sequence'], constraint)
+    design['dotplot'] = get_dotplot(design['sequence'], nupack, constraint)
     fill_energy(design['secstruct_elements'],design['sequence'],design['pairmap'])
     elements = design['secstruct_elements']
     total_energy = 0.0
