@@ -8,4 +8,5 @@ RESOURCE_DIR = os.path.join(base_dir, "resources")
 STRATEGY_DIR = os.path.join(base_dir, "strategies")
 PUZZLE_DIR = os.path.join(RESOURCE_DIR, "puzzles")
 VIENNA_DIR = os.path.join(RESOURCE_DIR, "vienna", "linux")
+NUPACK_DIR = os.path.join(RESOURCE_DIR, "nupack")
 

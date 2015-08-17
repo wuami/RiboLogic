@@ -6,7 +6,7 @@ import subprocess
 import eterna_utils
 import random
 import re
-from subprocess import Popen, PIPE, STDOUT
+from subprocess import Popen, PIPE, STDOUT, call
 import thread, time, sys
 from threading import Timer
 import settings

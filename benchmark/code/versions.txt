@@ -1,0 +1,3 @@
+nupack3.0.5c-clean
+ViennaRNA-2.1.9
+INFO-RNA-2.1.2
