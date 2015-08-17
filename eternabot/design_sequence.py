@@ -10,7 +10,34 @@ import argparse
 import requests
 import settings
 import varna
+import copy
 
+def get_objective_dict(o):
+    n = len(o['secstruct'])
+    constrained = ensemble_design.get_sequence_array('o'*n)
+    struct = ensemble_design.get_sequence_array(o['secstruct'])
+    if 'structure_constrained_bases' in o.keys() and len(o['structure_constrained_bases']) > 0:
+        for i in range(0, len(o['structure_constrained_bases']), 2):
+            [lo, hi] = o['structure_constrained_bases'][i:i+2]
+            for j in range(lo, hi+1):
+                constrained[j] = 'x'
+        del o['structure_constrained_bases']
+    if 'anti_structure_constrained_bases' in o.keys() and len(o['anti_structure_constrained_bases']) > 0:
+        for i in range(0, len(o['anti_structure_constrained_bases']), 2):
+            [lo, hi] = o['anti_structure_constrained_bases'][i:i+2]
+            for j in range(lo, hi+1):
+                constrained[j] = 'x'
+                struct[j] = '.'
+        del o['anti_secstruct'], o['anti_structure_constrained_bases']
+    if 'structure_unpaired_constrained_bases' in o.keys() and len(o['structure_unpaired_constrained_bases']) > 0:
+        for i in range(0, len(o['structure_unpaired_constrained_bases']), 2):
+            [lo, hi] = o['structure_unpaired_constrained_bases'][i:i+2]
+            for j in range(lo, hi+1):
+                constrained[j] = 'u'
+        del o['structure_unpaired_constrained_bases']
+    o['secstruct'] = ensemble_design.get_sequence_string(struct)
+    o['constrained'] = ensemble_design.get_sequence_string(constrained)
+    return o
     
 def read_puzzle_json(text, mode = "hairpin", scoring = "bpp"):
     """
@@ -27,35 +54,23 @@ def read_puzzle_json(text, mode = "hairpin", scoring = "bpp"):
     beginseq = p['beginseq']
     constraints = p['locks']
 
+    outputs = False
+    if "outputs" in p:
+        outputs = {}
+        for key in p['outputs']:
+            outputs[key] = get_objective_dict(p['outputs'][key])
+
     # load in objective secondary structures
     objective = json.loads(p['objective'])
     secstruct = [] 
     for o in objective:
-        n = len(o['secstruct'])
-        constrained = ensemble_design.get_sequence_array('o'*n)
-        struct = ensemble_design.get_sequence_array(o['secstruct'])
-        if 'structure_constrained_bases' in o.keys() and len(o['structure_constrained_bases']) > 0:
-            for i in range(0, len(o['structure_constrained_bases']), 2):
-                [lo, hi] = o['structure_constrained_bases'][i:i+2]
-                for j in range(lo, hi+1):
-                    constrained[j] = 'x'
-            del o['structure_constrained_bases']
-        if 'anti_structure_constrained_bases' in o.keys() and len(o['anti_structure_constrained_bases']) > 0:
-            for i in range(0, len(o['anti_structure_constrained_bases']), 2):
-                [lo, hi] = o['anti_structure_constrained_bases'][i:i+2]
-                for j in range(lo, hi+1):
-                    constrained[j] = 'x'
-                    struct[j] = '.'
-            del o['anti_secstruct'], o['anti_structure_constrained_bases']
-        if 'structure_unpaired_constrained_bases' in o.keys() and len(o['structure_unpaired_constrained_bases']) > 0:
-            for i in range(0, len(o['structure_unpaired_constrained_bases']), 2):
-                [lo, hi] = o['structure_unpaired_constrained_bases'][i:i+2]
-                for j in range(lo, hi+1):
-                    constrained[j] = 'u'
-            del o['structure_unpaired_constrained_bases']
-        o['secstruct'] = ensemble_design.get_sequence_string(struct)
-        o['constrained'] = ensemble_design.get_sequence_string(constrained)
-        secstruct.append(o)
+        if outputs:
+            objective = copy.deepcopy(outputs[o['output']])
+            objective['type'] = o['type']
+            objective['inputs'] = o['inputs']
+            secstruct.append(objective)
+        else:
+            secstruct.append(get_objective_dict(o))
 
     if 'linker' not in p:
         p['linker'] = "AACAA"
