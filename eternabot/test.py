@@ -1,7 +1,4 @@
-import design_sequence
-from design_utils import bp_distance_with_unpaired as bp
+import eterna_utils as eu
 
-f = open("resources/puzzles/xor_gate_3parity1.json", 'r')
-p = design_sequence.read_puzzle_json(f.read())
-s1 = ".....................................................(((((((((((((((.....................................................................)))))))...))))...))))"
-print bp(s1, p.targets[0]['secstruct'], p.targets[0]['constrained'], p.targets[0]['threshold'])
+print eu.get_pairmap_from_secstruct(["((((&)(.)(&))..))", [1,3,2]])
+

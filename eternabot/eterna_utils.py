@@ -154,6 +154,10 @@ def get_pairmap_from_secstruct(secstruct):
     returns:
     dictionary with pair mappings
     """
+    order = ""
+    if isinstance(secstruct, list):
+        order = secstruct[1]
+        secstruct = secstruct[0]
     pair_stack = []
     end_stack = []
     pairs_array = []
@@ -182,6 +186,28 @@ def get_pairmap_from_secstruct(secstruct):
     else:
          print "ERROR: pairing incorrect %s" % secstruct
 
+    # adjust pairs array for strand ordering
+    if order:
+        lengths = [len(x) for x in secstruct.split('&')]
+        n = len(lengths)
+        N = len(pairs_array)
+        ordered_lengths = [lengths[order.index(i+1)] for i in range(n)]
+        # shift indices
+        new_pairs_array = pairs_array[:]
+        for i in range(n):
+            if order[i] != i+1:
+                index_range = [sum(lengths[0:i]) + i, sum(lengths[0:i+1]) + i]
+                actual_position = order[i]-1
+                offset = sum(ordered_lengths[0:actual_position]) + actual_position
+                new_pairs_array = [pairs_array[i]-index_range[0]+offset if pairs_array[i] >= index_range[0] and pairs_array[i] < index_range[1] else new_pairs_array[i] for i in range(N)]
+        # reorder array
+        pairs_array = []
+        for i in range(n):
+            pos = order.index(i+1)
+            index_range = [sum(lengths[0:pos]) + pos, sum(lengths[0:pos+1]) + pos]
+            pairs_array += new_pairs_array[index_range[0]:index_range[1]] + [-1]
+        pairs_array = pairs_array[:-1]
+            
     return pairs_array
 
 def bp_distance(secstruct1, secstruct2):

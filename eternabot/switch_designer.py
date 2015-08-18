@@ -326,7 +326,8 @@ class SwitchDesigner(object):
             elif self.mode == "hairpin":
                 fold = inv_utils.fold(fold_sequence, self.cotrans)[0]
             else:
-                fold = inv_utils.nupack_fold(fold_sequence)[0]
+                fold_result = inv_utils.nupack_fold(fold_sequence)
+                fold = [fold_result[0], fold_result[2]]
             native.append(fold)
         bp_distance = self.score_secstructs(native)
         return [sequence, native, bp_distance, fold_sequences]

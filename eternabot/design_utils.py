@@ -15,6 +15,11 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
     returns:
     bp distance between structures
     """
+    order1 = ""
+    if isinstance(secstruct1, list):
+        order1 = secstruct1[1]
+        secstruct1 = secstruct1[0]
+
     # ensure that secondary structures are the same length
     if(len(secstruct1) != len(secstruct2)):
         print "SS1 (%s) and SS2 (%s) lengths don't match" % (len(secstruct1), len(secstruct2))
@@ -24,7 +29,10 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
         threshold = [[0,len(locks)-1,locks.count("u")]]
     
     # generate pair mappings
-    pairmap1 = eterna_utils.get_pairmap_from_secstruct(secstruct1)
+    if order1:
+        pairmap1 = eterna_utils.get_pairmap_from_secstruct([secstruct1, order1])
+    else:
+        pairmap1 = eterna_utils.get_pairmap_from_secstruct(secstruct1)
     pairmap2 = eterna_utils.get_pairmap_from_secstruct(secstruct2)
     
     # +1 for each pair or single that doesn't match
