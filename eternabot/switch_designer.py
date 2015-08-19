@@ -10,6 +10,7 @@ import ensemble_design
 import unittest
 import sys
 import networkx as nx
+import multiprocessing
 
 class SwitchDesigner(object):
 
@@ -54,6 +55,8 @@ class SwitchDesigner(object):
             del self.inputs['pos']
         else:
             self.input_pos = [0]*(len(self.inputs)+1)
+        n_cores = min(16, self.n_targets)
+        self.pool = multiprocessing.Pool(n_cores)
         
         # update dependency graph
         self.dep_graph = self.get_dependency_graph()
@@ -323,12 +326,13 @@ class SwitchDesigner(object):
             fold_sequences.append(fold_sequence)
             if self.mode == "ghost":
                 fold = inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
+                native.append(fold)
             elif self.mode == "hairpin":
                 fold = inv_utils.fold(fold_sequence, self.cotrans)[0]
-            else:
-                fold_result = inv_utils.nupack_fold(fold_sequence)
-                fold = [fold_result[0], fold_result[2]]
-            native.append(fold)
+                native.append(fold)
+        if self.mode == "nupack":
+            native = self.pool.map(inv_utils.nupack_fold, fold_sequences)
+            native = [[x[0], x[2]] for x in native]
         bp_distance = self.score_secstructs(native)
         return [sequence, native, bp_distance, fold_sequences]
 
