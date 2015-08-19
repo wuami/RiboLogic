@@ -1,0 +1,28 @@
+RNAensign: A global sampling approach to designing and reengineering
+RNA secondary structures.
+
+Software version 0.1
+
+Note that this software comes with no warranties, express or implied.
+Use at your own risk.
+
+Compatible with Unix and GNU/Linux.
+
+Prerequisites: You must have RNAmutants2 installed on your machine.  
+You can obtain it at http://csb.cs.mcgill.ca/RNAmutants
+
+This distribution comes with a binary of RNAfold, which is
+produced by the Vienna RNA group. 
+
+To use RNAensign, run:
+
+ python RNAensign.py <structure> <seed_sequence>
+e.g. 
+
+python RNAensign.py '(((................)))' AAAUUUUUUUUUUUGGUUUUUU
+
+Example output:
+Sequence:  GGCUUUUUUUUUUUGGUUUGCC
+Distance:  6
+Probability:  0.404417
+
