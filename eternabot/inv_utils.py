@@ -60,7 +60,8 @@ def nupack_fold(seq, bpp = False):
     f.write("%s\n" % len(split))
     for seq in split:
         f.write("%s\n" % seq)
-    f.write("%s\n" % len(split))
+    f.write("1\n")
+    os.system("cp %s/%s.list %s.list" % (settings.NUPACK_DIR, len(split), rand_string))
     f.close()
     options = ['-material', 'rna1999', '-ordered', '-mfe']#, '-quiet']
     if bpp:

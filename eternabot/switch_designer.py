@@ -146,7 +146,7 @@ class SwitchDesigner(object):
                     # add input sequence
                     seq = self.inputs[input]
                     if input in target['inputs']:
-                        constrained += 'x'*len(seq)
+                        constrained += 'o'*len(seq)
                         if self.mode == "hairpin":
                             hairpin_len = (len(seq)-4)/2
                             if self.hp_mismatch:

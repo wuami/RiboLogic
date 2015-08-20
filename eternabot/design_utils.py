@@ -40,17 +40,17 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
     umatch = 0
     j = 0
     for i in range(0,len(locks)):
-        if(locks[i] == "o"):
-            continue
-        elif(locks[i] == "u"):
+        if(locks[i] == "u"):
             if(secstruct1[i] == secstruct2[i]):
                 umatch += 1
-        else:
+        elif locks[i] == "x":
             if(pairmap1[i] != pairmap2[i]):
                 if(pairmap1[i] > i):
                     dist += 1
                 if(pairmap2[i] > i):
                     dist += 1
+        else:
+            continue
         if i == threshold[j][1]:
             dist += max(threshold[j][2]-umatch, 0)
             udist = 0
