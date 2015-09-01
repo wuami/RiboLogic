@@ -112,6 +112,7 @@ def optimize_n(puzzle, niter, ncool, n, submit, draw, fout, cotrans, prints, gre
         else:
             #niter += 500
             print "best distance: %s" % puzzle.best_bp_distance
+            print "final conc: %s" % puzzle.oligo_conc
             attempts += 1
             if attempts == 10:
                 break

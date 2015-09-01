@@ -12,6 +12,7 @@ import settings
 
 
 DEFAULT_TEMPERATURE = 37.0
+DEFAULT_PARAMS = 'rna'
 BASES = ['A','U','G','C']
 #fold a sequence
 #@param seq:sequence
@@ -50,51 +51,50 @@ def fold(seq, cotransc=False, constraint=False):
     ret.append(toks[2][1:-1])
     return ret
 
-def nupack_fold(seq, bpp = False):
+def nupack_fold(seq, oligo_conc, bpp = False):
     """
     folds sequence using nupack
     """
     rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(5))
     split = seq.split("&")
-    f = open("%s.in" % rand_string, "w")
-    f.write("%s\n" % len(split))
-    for seq in split:
-        f.write("%s\n" % seq)
-    f.write("1\n")
+    with open("%s.in" % rand_string, "w") as f:
+        f.write("%s\n" % len(split))
+        for seq in split:
+            f.write("%s\n" % seq)
+        f.write("1\n")
     os.system("cp %s/%s.list %s.list" % (settings.NUPACK_DIR, len(split), rand_string))
-    f.close()
-    options = ['-material', 'rna1999', '-ordered', '-mfe']#, '-quiet']
+    with open("%s.con" % rand_string, "w") as f:
+        f.write("%s\n" % oligo_conc * (len(split)-1))
+        f.write("1e-9\n")
+    options = ['-material', DEFAULT_PARAMS, '-ordered', '-mfe']#, '-quiet']
     if bpp:
         options.append('-pairs')
     p = Popen([os.path.join(settings.NUPACK_DIR,'complexes')] + options + [rand_string], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
     p.wait()
+    p = Popen([os.path.join(settings.NUPACK_DIR,'concentrations'), '-ordered', rand_string], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    p.wait()
+    # get mfe
+    with open("%s.eq" % rand_string) as f_eq:
+        for line in f_eq:
+            if not line.startswith("%"):
+                mfe = line.strip().split()
+                if int(mfe[-3]):
+                    break
     # get strand ordering
-    strands_dict = {}
     with open("%s.ocx-key" % rand_string) as f_key:
         for line in f_key:
-            if not line.startswith("%"):
-                spl = line.strip().split("\t")
-                strands_dict[(spl[0], spl[1])] = spl[2:]
+            if line.startswith("%s\t%s" % (mfe[0], mfe[1])):
+                strands = [int(x) for x in line.strip().split()[2:]]
+                break
     # get mfe structure
     with open("%s.ocx-mfe" % rand_string) as f_mfe:
-        best_complex = -1
-        best_strands = []
-        best_mfe = float("inf")
-        best_fold = ""
         line = f_mfe.readline()
         while line:
-            if line.startswith("% complex"):
-                m = re.search(r"complex([0-9]+)-order([0-9]+)", line)
-                complex = (m.group(1), m.group(2))
-                strands = strands_dict[complex]
-                if len(strands) == len(set(strands)) and len(strands) == len(split):
-                    f_mfe.readline()
-                    energy = float(f_mfe.readline().strip())
-                    if energy < best_mfe:
-                        best_complex = complex
-                        best_strands = [int(x) for x in strands]
-                        best_mfe = energy
-                        best_fold = f_mfe.readline().strip()
+            if line.startswith("%% complex%s-order%s" % (mfe[0], mfe[1])):
+                f_mfe.readline()
+                energy = f_mfe.readline().strip()
+                secstruct = f_mfe.readline().strip()
+                break
             line = f_mfe.readline()
 
     if bpp:
@@ -102,25 +102,22 @@ def nupack_fold(seq, bpp = False):
         with open("%s.cx-epairs" % rand_string) as f_pairs:
             line = f_pairs.readline()
             while line:
-                if line.startswith("% complex%s" % complex[0]):
+                if line.startswith("%% complex%s" % complex[0]):
                     f_pairs.readline()
                     line = f_pairs.readline()
                     while not line.startswith("%"):
                         bpp_matrix.append(line.strip().split())
+                line = f_mfe.readline()
         os.system("rm %s*" % rand_string)
         return bpp_matrix
 
-    # get secondary structures in order
+    # get full secondary structure
+    for i in range(len(split)):
+        if i+1 not in strands:
+            secstruct += "&" + "."*len(split[i])
+            strands.append(i+1)
     os.system("rm %s*" % rand_string)
-    return [best_fold.replace("+", "&"), best_mfe, best_strands]
-    secstructs = best_fold.split("+")
-    folds = []
-    for i in range(1, len(split)+1):
-        if i in best_strands:
-            folds.append(secstructs[best_strands.index(i)])
-        else:
-            folds.append("."*len(split[i-1]))
-    return ["&".join(folds), best_mfe]
+    return [secstruct.replace("+", "&"), energy, strands]
 
 def fill_gc(elem , pair_map , seq, rand ):
     if(elem.type_ != eterna_utils.RNAELEMENT_STACK):

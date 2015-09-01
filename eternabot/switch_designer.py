@@ -39,6 +39,7 @@ class SwitchDesigner(object):
         #if type == "multi_input_oligo":
         self.bp_distance_func = design_utils.bp_distance_with_unpaired
         self.greedy = False
+        self.oligo_conc = 1e-7
         #else:
         #    self.bp_distance_func = design_utils.bp_distance_with_constraint
         self.mode = mode
@@ -56,7 +57,6 @@ class SwitchDesigner(object):
         else:
             self.input_pos = [0]*(len(self.inputs)+1)
         n_cores = min(16, self.n_targets)
-        self.pool = multiprocessing.Pool(n_cores)
         
         # update dependency graph
         self.dep_graph = self.get_dependency_graph()
@@ -94,10 +94,10 @@ class SwitchDesigner(object):
         self.all_solutions = []
 
         #if type == "multi_input_oligo":
-        #    self.set_oligo_rc()
-        #    self.mutate_func = self.mutate_or_shift
+        self.set_oligo_rcs()
+        self.mutate_func = self.mutate_or_shift
         #else:
-        self.mutate_func = self.mutate_sequence
+        #self.mutate_func = self.mutate_sequence
         
     def get_dependency_graph(self):
         """ get dependency graph based on target secondary structures """
@@ -112,12 +112,24 @@ class SwitchDesigner(object):
             raise ValueError("dependency graph is not bipartite")
         return graph
 
-    def set_oligo_rc(self):
+    def set_oligo_rcs(self):
+        self.oligo_rc = []
+        self.oligo_pos = []
+        self.oligo_len = []
+        self.oligo_len_sum = 0
+        inputs = self.inputs.values()
+        self.set_oligo_rc(inputs[0], [0,len(inputs[0])])
+        self.set_oligo_rc(inputs[1], [self.n-len(inputs[1]), self.n])
+
+    def set_oligo_rc(self, seq, range):
         """ set oligo rc parameters for shifting complement sequece"""
-        lo, hi = self.n-49, self.n-27
-        self.oligo_rc = self.beginseq[lo:hi]
-        self.oligo_pos = [lo,hi]
-        self.oligo_len = [0,21]
+        #lo, hi = self.n-49, self.n-27
+        rc = design_utils.rc(seq)
+        self.beginseq = self.beginseq[0:range[0]] + rc + self.beginseq[range[1]:]
+        self.oligo_rc.append(rc)
+        self.oligo_pos.append(range)
+        self.oligo_len.append([0,range[1]-range[0]-1])
+        self.oligo_len_sum += len(seq)
 
     def create_target_secstructs(self):
         """ add oligo secstructs to target secstruct """
@@ -246,7 +258,7 @@ class SwitchDesigner(object):
             elif self.mode == "hairpin":
                 print inv_utils.fold(fold_sequence, self.cotrans)[0]
             else:
-                print inv_utils.nupack_fold(fold_sequence)[0]
+                print inv_utils.nupack_fold(fold_sequence, self.target_oligo_conc)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
 
     def draw_solution(self, name):
@@ -319,8 +331,10 @@ class SwitchDesigner(object):
         get sequence information - native fold, bp distance, pairmap, design
         for a particular sequence
         """
-        native = []
+        native = [""] * self.n_targets
         fold_sequences = []
+        if self.mode == "nupack":
+            p = multiprocessing.Pool(self.n_targets)
         for i in range(self.n_targets):
             fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
             fold_sequences.append(fold_sequence)
@@ -330,8 +344,12 @@ class SwitchDesigner(object):
             elif self.mode == "hairpin":
                 fold = inv_utils.fold(fold_sequence, self.cotrans)[0]
                 native.append(fold)
+            else:
+                native[i] = p.apply_async(inv_utils.nupack_fold, args=(fold_sequence, self.oligo_conc))
         if self.mode == "nupack":
-            native = self.pool.map(inv_utils.nupack_fold, fold_sequences)
+            p.close()
+            p.join()
+            native = [x.get() for x in native]
             native = [[x[0], x[2]] for x in native]
         bp_distance = self.score_secstructs(native)
         return [sequence, native, bp_distance, fold_sequences]
@@ -396,7 +414,7 @@ class SwitchDesigner(object):
         return self.score_secstructs(secstruct) == 0
 
     def check_current_secstructs(self):
-        return self.score_secstructs(self.best_native) == 0
+        return self.score_secstructs(self.best_native) == 0 and self.oligo_conc == self.target_oligo_conc
 
     def mutate_or_shift(self, sequence):
         """
@@ -404,35 +422,40 @@ class SwitchDesigner(object):
         """
         mut_array = ensemble_design.get_sequence_array(self.sequence)
         # mutate randomly wp 0.5, otherwise mutate oligo rc
-        if (random.random() > float(self.oligo_len[1]-self.oligo_len[0]+1)/sum([len(x) for x in self.index_array])):
+        if (random.random() > float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
             return self.mutate_sequence(sequence)
         else:
+            # randomly choose an oligo
+            roligo = random.getrandbits(1)
             ## wp 0.5 change length
             #if random.random() < 0.5:
             rindex = random.getrandbits(1) # pick left or right
+            if self.oligo_pos[roligo][rindex] == self.n:
+                rindex = 0
             # wp 0.5 expand
-            if (random.random() < 0.5 or self.oligo_len[1]-self.oligo_len[0] <= 0) and \
-                self.oligo_len[1]-self.oligo_len[0] != len(self.oligo_rc)-1:
+            if (random.random() < 0.5 or self.oligo_len[roligo][1]-self.oligo_len[roligo][0] <= 0) and \
+                self.oligo_len[roligo][1]-self.oligo_len[roligo][0] != len(self.oligo_rc)-1:
                 min_index = min(list(itertools.chain(*self.index_array)))
                 max_index = max(list(itertools.chain(*self.index_array)))
-                if (rindex or self.oligo_pos[0] == min_index or self.oligo_len[0] == 0) and \
-                    self.oligo_pos[1] != max_index and self.oligo_len[1] != len(self.oligo_rc)-1 and\
-                    self.constraints[self.oligo_pos[rindex]+1] != 'x':
-                    self.oligo_pos[rindex] += 1
-                    self.oligo_len[rindex] += 1
-                elif self.constraints[self.oligo_pos[rindex]-1] != 'x':
-                    self.oligo_pos[rindex] -= 1
-                    self.oligo_len[rindex] -= 1
-                mut_array[self.oligo_pos[rindex]] = self.oligo_rc[self.oligo_len[rindex]]
+                if (rindex or self.oligo_pos[roligo][0] == min_index or self.oligo_len[roligo][0] == 0) and \
+                    self.oligo_pos[roligo][1] != max_index and self.oligo_len[roligo][1] != len(self.oligo_rc[roligo])-1 and\
+                    self.constraints[self.oligo_pos[roligo][rindex]+1] != 'x':
+                    self.oligo_pos[roligo][rindex] += 1
+                    self.oligo_len[roligo][rindex] += 1
+                elif self.constraints[self.oligo_pos[roligo][rindex]-1] != 'x':
+                    self.oligo_pos[roligo][rindex] -= 1
+                    self.oligo_len[roligo][rindex] -= 1
+                mut_array[self.oligo_pos[roligo][rindex]] = self.oligo_rc[roligo][self.oligo_len[roligo][rindex]]
             # otherwise shrink
             else:
-                mut_array[self.oligo_pos[rindex]] = ensemble_design.get_random_base()
+                mut_array[self.oligo_pos[roligo][rindex]] = ensemble_design.get_random_base()
                 if rindex:
-                    self.oligo_pos[rindex] -= 1
-                    self.oligo_len[rindex] -= 1
+                    self.oligo_pos[roligo][rindex] -= 1
+                    self.oligo_len[roligo][rindex] -= 1
                 else:
-                    self.oligo_pos[rindex] += 1
-                    self.oligo_len[rindex] += 1 
+                    self.oligo_pos[roligo][rindex] += 1
+                    self.oligo_len[roligo][rindex] += 1 
+            self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
         return ensemble_design.get_sequence_string(mut_array)
 
     def mutate_sequence(self, sequence):
@@ -458,7 +481,7 @@ class SwitchDesigner(object):
                 updated.append(pos)
                 self.update_neighbors(pos, mut_array, updated)
 
-    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, prints = None):
+    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, prints = None, target_oligo_conc=1e-7):
         """
         monte-carlo optimization of the sequence
 
@@ -483,6 +506,8 @@ class SwitchDesigner(object):
         #self.optimize_start_sequence()
 
         T = 5.0
+        self.target_oligo_conc = target_oligo_conc
+        self.oligo_conc = 1.0
 
         def p_dist(dist, new_dist):
             """probability function"""
@@ -502,10 +527,8 @@ class SwitchDesigner(object):
             mut_sequence = self.mutate_func(self.sequence)
             [mut_sequence, native, bp_distance, fold_sequences] = self.get_sequence_info(mut_sequence)
 
-            # if current sequence is a solution, save to list
             if self.best_bp_distance != 0 and bp_distance == 0:
                 print i
-            #    self.all_solutions.append([mut_sequence, score])
             
             # if distance or score is better for mutant, update the current sequence
             if self.greedy:
@@ -519,6 +542,7 @@ class SwitchDesigner(object):
                 self.update_sequence(mut_sequence, native, bp_distance, score)
                 if self.prints:
                     print self.sequence, self.bp_distance, self.design_score
+                    print "conc: %s" % self.oligo_conc
                     for j in range(self.n_targets):
                         print self.native[j]
                         #print self.get_fold_sequence(self.sequence, self.targets[j])
@@ -536,6 +560,19 @@ class SwitchDesigner(object):
                 T -= 0.1
                 if T < 1:
                     T = 1
+            
+            # update oligo_conc
+            if self.best_bp_distance == 0:
+                if self.oligo_conc > target_oligo_conc:
+                    if self.oligo_conc/10 <= target_oligo_conc:
+                        self.oligo_conc = target_oligo_conc
+                    else:
+                        self.oligo_conc /= 10
+                self.update_sequence(self.sequence)
+                self.update_best()
+                print self.native, self.bp_distance
+                print self.best_native, self.best_bp_distance
+            #    self.all_solutions.append([mut_sequence, score])
         
         return
 
