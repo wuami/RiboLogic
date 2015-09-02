@@ -422,37 +422,49 @@ class SwitchDesigner(object):
         """
         mut_array = ensemble_design.get_sequence_array(self.sequence)
         # mutate randomly wp 0.5, otherwise mutate oligo rc
-        if (random.random() > float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
+        if (random.random() > 0.5): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
             return self.mutate_sequence(sequence)
         else:
             # randomly choose an oligo
             roligo = random.getrandbits(1)
-            ## wp 0.5 change length
-            #if random.random() < 0.5:
-            rindex = random.getrandbits(1) # pick left or right
-            if self.oligo_pos[roligo][rindex] == self.n:
+
+            # choose left or right
+            maxed_out = False
+            min_index = min(list(itertools.chain(*self.index_array)))
+            max_index = max(list(itertools.chain(*self.index_array)))
+            if self.oligo_pos[roligo][1] >= self.n or self.oligo_pos[roligo][1] >= max_index or \
+               self.oligo_len[roligo][1] >= len(self.oligo_rc[roligo])-1 or self.constraints[self.oligo_pos[roligo][1]] == 'x':
                 rindex = 0
+                maxed_out = True
+            if self.oligo_pos[roligo][0] <= 0 or self.oligo_pos[roligo][0] <= min_index or \
+                 self.oligo_len[roligo][0] <= 0 or self.constraints[self.oligo_pos[roligo][0]-1] == 'x':
+                rindex = 1
+                maxed_out = maxed_out and True
+            if 'rindex' not in locals():
+                rindex = random.getrandbits(1)
             # wp 0.5 expand
             if (random.random() < 0.5 or self.oligo_len[roligo][1]-self.oligo_len[roligo][0] <= 0) and \
-                self.oligo_len[roligo][1]-self.oligo_len[roligo][0] != len(self.oligo_rc)-1:
-                min_index = min(list(itertools.chain(*self.index_array)))
-                max_index = max(list(itertools.chain(*self.index_array)))
-                if (rindex or self.oligo_pos[roligo][0] == min_index or self.oligo_len[roligo][0] == 0) and \
-                    self.oligo_pos[roligo][1] != max_index and self.oligo_len[roligo][1] != len(self.oligo_rc[roligo])-1 and\
-                    self.constraints[self.oligo_pos[roligo][rindex]+1] != 'x':
+                self.oligo_len[roligo][1]-self.oligo_len[roligo][0] != len(self.oligo_rc)-1 and not maxed_out:
+                if rindex:
+                    mut_array[self.oligo_pos[roligo][rindex]] = self.oligo_rc[roligo][self.oligo_len[roligo][rindex]]
                     self.oligo_pos[roligo][rindex] += 1
                     self.oligo_len[roligo][rindex] += 1
-                elif self.constraints[self.oligo_pos[roligo][rindex]-1] != 'x':
+                else:
                     self.oligo_pos[roligo][rindex] -= 1
                     self.oligo_len[roligo][rindex] -= 1
-                mut_array[self.oligo_pos[roligo][rindex]] = self.oligo_rc[roligo][self.oligo_len[roligo][rindex]]
+                    #print self.oligo_pos[roligo][rindex]
+                    #print self.oligo_len[roligo][rindex]
+                    mut_array[self.oligo_pos[roligo][rindex]] = self.oligo_rc[roligo][self.oligo_len[roligo][rindex]]
             # otherwise shrink
             else:
-                mut_array[self.oligo_pos[roligo][rindex]] = ensemble_design.get_random_base()
                 if rindex:
                     self.oligo_pos[roligo][rindex] -= 1
                     self.oligo_len[roligo][rindex] -= 1
+                    mut_array[self.oligo_pos[roligo][rindex]] = ensemble_design.get_random_base()
                 else:
+                    #print self.oligo_pos[roligo]
+                    #print self.oligo_len[roligo]
+                    mut_array[self.oligo_pos[roligo][rindex]] = ensemble_design.get_random_base()
                     self.oligo_pos[roligo][rindex] += 1
                     self.oligo_len[roligo][rindex] += 1 
             self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
