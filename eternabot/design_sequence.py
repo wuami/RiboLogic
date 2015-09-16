@@ -39,7 +39,7 @@ def get_objective_dict(o):
     o['constrained'] = ensemble_design.get_sequence_string(constrained)
     return o
     
-def read_puzzle_json(text, mode = "hairpin", scoring = "bpp"):
+def read_puzzle_json(text, mode = "hairpin", scoring = "bpp", oligorc = False):
     """
     read in puzzle as a json file
     """
@@ -76,10 +76,10 @@ def read_puzzle_json(text, mode = "hairpin", scoring = "bpp"):
         p['linker'] = "AACAA"
 
     if p['rna_type'] == "multi_input" or p['rna_type'] == "multi_input_oligo":
-        return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, p['inputs'], mode)
-    return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, mode=mode)
+        return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, p['inputs'], mode, oligorc=oligorc)
+    return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, mode=mode, oligorc=oligorc)
 
-def optimize_n(puzzle, niter, ncool, n, submit, draw, fout, cotrans, prints, greedy):
+def optimize_n(puzzle, niter, ncool, n, **kwargs):#submit, draw, fout, cotrans, prints, greedy):
     # run puzzle n times
     solutions = []
     scores = []
@@ -87,24 +87,25 @@ def optimize_n(puzzle, niter, ncool, n, submit, draw, fout, cotrans, prints, gre
     attempts = 0
     while i < n:
         puzzle.reset_sequence()
-        puzzle.optimize_sequence(niter, ncool, greedy=greedy, cotrans=cotrans, prints=prints)
+        passkwargs = {key:kwargs[key] for key in ['greedy', 'cotrans', 'prints']}
+        puzzle.optimize_sequence(niter, ncool, **passkwargs)#greedy=greedy, cotrans=cotrans, prints=prints)
         if puzzle.check_current_secstructs():
             sol = puzzle.get_solution()
             if sol[0] not in solutions:
                 solutions.append(sol[0])
                 scores.append(sol[2])
                 print sol
-                if submit:
+                if 'submit' in kwargs and kwargs['submit']:
                     post_solution(puzzle, 'solution %s' % i)
-                if draw:
+                if 'draw' in kwargs and kwargs['draw']:
                     puzzle.draw_solution(i)
-                if fout:
+                if 'fout' in kwargs and kwargs['fout']:
                     params = ""
-                    if greedy:
+                    if 'greedy' in kwargs and kwargs['greedy']:
                         params += "greedy "
-                    if cotrans:
+                    if 'cotrans' in kwargs and kwargs['cotrans']:
                         params += "cotranscriptional"
-                    with open(fout, 'a') as f:
+                    with open(kwargs['fout'], 'a') as f:
                         f.write("# %s iterations, %s coolings, %s\n" % (niter, ncool, params))
                         f.write("%s\t%1.6f\n" % (sol[0], sol[2]))
                 i += 1
@@ -119,11 +120,11 @@ def optimize_n(puzzle, niter, ncool, n, submit, draw, fout, cotrans, prints, gre
         print "%s sequence(s) calculated" % i
     return [solutions, scores]
 
-def get_puzzle(id, mode, scoring):
+def get_puzzle(id, mode, scoring, oligorc):
     puzzlefile = os.path.join(settings.PUZZLE_DIR, "%s.json" % id)
     if os.path.isfile(puzzlefile): 
         with open(puzzlefile, 'r') as f:
-            puzzle = read_puzzle_json(f.read(), mode, scoring)
+            puzzle = read_puzzle_json(f.read(), mode, scoring, oligorc)
     else:
         puzzle = get_puzzle_from_server(id, mode, scoring)
     return puzzle
@@ -196,10 +197,11 @@ def main():
     p.add_argument('--cotrans', help="enable cotranscriptional folding", default=False, action='store_true')
     p.add_argument('--prints', help="print sequences throughout optimization", default=False, action='store_true')
     p.add_argument('--greedy', help="greedy search", default=False, action='store_true')
+    p.add_argument('--oligorc', help="introduce reverse complement of input oligos", default=False, action='store_true')
     args = p.parse_args()
 
     # read puzzle
-    puzzle = get_puzzle(args.puzzleid, args.mode, args.score)
+    puzzle = get_puzzle(args.puzzleid, args.mode, args.score, args.oligorc)
     if not args.nowrite:
         fout = os.path.join(settings.PUZZLE_DIR, args.puzzleid + "_" + puzzle.mode + ".out")
     else:
@@ -212,7 +214,7 @@ def main():
     #view_sequence(puzzle, seq)
 
     # find solutions
-    [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, args.submit, args.draw, fout, args.cotrans, args.prints, args.greedy)
+    [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, submit=args.submit, draw=args.draw, fout=fout, cotrans=args.cotrans, prints=args.prints, greedy=args.greedy)
 
 if __name__ == "__main__":
     #unittest.main()

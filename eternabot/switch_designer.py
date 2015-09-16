@@ -14,7 +14,7 @@ import multiprocessing
 
 class SwitchDesigner(object):
 
-    def __init__(self, id, type, beginseq, constraints, targets, design_linker, scoring = "bpp", inputs = None, mode = "ghost"):
+    def __init__(self, id, type, beginseq, constraints, targets, design_linker, scoring = "bpp", inputs = None, mode = "ghost", oligorc = False):
         # sequence information
         self.id = id
         self.type = type
@@ -94,17 +94,18 @@ class SwitchDesigner(object):
         self.all_solutions = []
 
         #if type == "multi_input_oligo":
-        self.set_oligo_rcs()
-        self.mutate_func = self.mutate_or_shift
-        #else:
-        #self.mutate_func = self.mutate_sequence
+        if oligorc:
+            self.set_oligo_rcs()
+            self.mutate_func = self.mutate_or_shift
+        else:
+            self.mutate_func = self.mutate_sequence
         
     def get_dependency_graph(self):
         """ get dependency graph based on target secondary structures """
         graph = nx.Graph()
         graph.add_nodes_from(range(self.n))
         for target in self.targets:
-            pairmap = eterna_utils.get_pairmap_from_secstruct(target['secstruct'])
+            pairmap = eterna_utils.get_pairmap_from_secstruct(target['secstruct'].split('&')[-1])
             for i, j in enumerate(pairmap):
                 if j > i:
                     graph.add_edge(i,j)
@@ -134,7 +135,7 @@ class SwitchDesigner(object):
     def create_target_secstructs(self):
         """ add oligo secstructs to target secstruct """
         for target in self.targets:
-            if target['type'] == 'oligos':
+            if target['type'] == 'oligos' and target['secstruct'] == self.n:
                 # initialize sequences
                 secstruct = ""
                 constrained = ""
@@ -362,8 +363,9 @@ class SwitchDesigner(object):
         self.update_sequence(self.sequence)
         self.update_best()
         self.all_solutions = []
-        if self.type == "multi_input_oligo":
-            self.set_oligo_rc()
+#        if self.type == "multi_input_oligo":
+        if self.mode == "nupack":
+            self.set_oligo_rcs()
 
     def update_sequence(self, sequence, native=None, bp_distance=None, score=None):
         """
@@ -393,14 +395,26 @@ class SwitchDesigner(object):
         returns:
         sum of bp distances with and without the oligo 
         """
-        distance = 0
+        distance = 0.0
+        strands_bonus = 0.0
+        n_strands = 0.0
         for i in range(self.n_targets):
             if "threshold" in self.targets[i]:
                 distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'], self.targets[i]['threshold'])
             else:
                 distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'])
+            if self.mode == "nupack":
+                strands = secstruct[i][0].split("&")
+                for strand in secstruct[i][1]:
+                    n_strands += 1
+                    if strand != len(strands) and "(" in strands[strand]:
+                        strands_bonus += 1
             if self.prints:
                 print distance,
+        if strands_bonus:
+            distance /= strands_bonus/n_strands
+            if self.prints:
+                print "bonus: %d" % distance
         return distance
 
     def check_secstructs(self, secstruct):
@@ -422,7 +436,7 @@ class SwitchDesigner(object):
         """
         mut_array = ensemble_design.get_sequence_array(self.sequence)
         # mutate randomly wp 0.5, otherwise mutate oligo rc
-        if (random.random() > 0.5): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
+        if (random.random() > 0.8): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
             return self.mutate_sequence(sequence)
         else:
             # randomly choose an oligo
@@ -440,10 +454,11 @@ class SwitchDesigner(object):
                  self.oligo_len[roligo][0] <= 0 or self.constraints[self.oligo_pos[roligo][0]-1] == 'x':
                 rindex = 1
                 maxed_out = maxed_out and True
+            print rindex
             if 'rindex' not in locals():
                 rindex = random.getrandbits(1)
             # wp 0.5 expand
-            if (random.random() < 0.5 or self.oligo_len[roligo][1]-self.oligo_len[roligo][0] <= 0) and \
+            if (random.random() < 0.6 or self.oligo_len[roligo][1]-self.oligo_len[roligo][0] <= len(self.oligo_rc)-5) and \
                 self.oligo_len[roligo][1]-self.oligo_len[roligo][0] != len(self.oligo_rc)-1 and not maxed_out:
                 if rindex:
                     mut_array[self.oligo_pos[roligo][rindex]] = self.oligo_rc[roligo][self.oligo_len[roligo][rindex]]
@@ -552,6 +567,7 @@ class SwitchDesigner(object):
                 if self.bp_distance == bp_distance and self.design_score != 0 and random.random() > p_dist(self.design_score, score):
                     continue
                 self.update_sequence(mut_sequence, native, bp_distance, score)
+                print self.oligo_pos
                 if self.prints:
                     print self.sequence, self.bp_distance, self.design_score
                     print "conc: %s" % self.oligo_conc

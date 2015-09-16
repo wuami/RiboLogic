@@ -91,15 +91,21 @@ def bp_distance_with_constraint(secstruct1, secstruct2, locks):
                 dist += 1
     return dist
 
-def rc(bases):
+def rc(bases, pGU=0.1):
     rc = ""
     for base in reversed(bases):
         if base == "G":
-            rc += "C"
+            if random.random() < pGU:
+                rc += "U"
+            else:
+                rc += "C"
         elif base == "C":
             rc += "G"
         elif base == "U":
-            rc += "A"
+            if random.random() < pGU:
+                rc += "G"
+            else:
+                rc += "A"
         elif base == "A":
             rc += "U"
     return rc

@@ -55,7 +55,8 @@ def nupack_fold(seq, oligo_conc, bpp = False):
     """
     folds sequence using nupack
     """
-    rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(5))
+    os.system("source ~/.bashrc")
+    rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
     split = seq.split("&")
     with open("%s.in" % rand_string, "w") as f:
         f.write("%s\n" % len(split))
@@ -69,9 +70,9 @@ def nupack_fold(seq, oligo_conc, bpp = False):
     options = ['-material', DEFAULT_PARAMS, '-ordered', '-mfe']#, '-quiet']
     if bpp:
         options.append('-pairs')
-    p = Popen([os.path.join(settings.NUPACK_DIR,'complexes')] + options + [rand_string], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    p = Popen([os.path.join(settings.NUPACK_DIR,'complexes')] + options + [rand_string], stdout=PIPE, stdin=PIPE, stderr=PIPE)
     p.wait()
-    p = Popen([os.path.join(settings.NUPACK_DIR,'concentrations'), '-ordered', rand_string], stdout=PIPE, stdin=PIPE, stderr=STDOUT)
+    p = Popen([os.path.join(settings.NUPACK_DIR,'concentrations'), '-ordered', rand_string], stdout=PIPE, stdin=PIPE, stderr=PIPE)
     p.wait()
     # get mfe
     with open("%s.eq" % rand_string) as f_eq:
