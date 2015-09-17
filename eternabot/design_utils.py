@@ -91,6 +91,18 @@ def bp_distance_with_constraint(secstruct1, secstruct2, locks):
                 dist += 1
     return dist
 
+def get_rcs(base):
+    if base == "G":
+        return ["U", "C"]
+    elif base == "U":
+        return ["G", "A"]
+    elif base == "A":
+        return ["U"]
+    elif base == "C":
+        return ["G"]
+    else:
+        raise ValueError("invalid base: %s" % base)
+
 def rc(bases, pGU=0.1):
     rc = ""
     for base in reversed(bases):
