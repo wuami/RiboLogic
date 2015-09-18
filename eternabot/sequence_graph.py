@@ -14,6 +14,10 @@ class SequenceGraph(object):
 
         self.index_array = self.get_unconstrained_indices()
         self.dep_graph = self.get_dependency_graph()
+        #for node in self.dep_graph.nodes():
+        #    print node, self.dep_graph.node[node]['bases']
+        #    for pos in nx.all_neighbors(self.dep_graph, node):
+        #        print "\t", pos, self.dep_graph.node[pos]['bases']
         seq_array = ensemble_design.get_sequence_array(self.sequence)
         for i in range(self.n):
             if self.seq_locks[i] == "x":
@@ -89,19 +93,19 @@ class SequenceGraph(object):
             constraint += "x"*len(self.inputs[input]) + "o"
         constraint += self.seq_locks
         seq += self.sequence
-        for i in range(len(self.seq_locks)):
-            if self.seq_locks[i] == "x":
+        for i in range(len(constraint)):
+            if constraint[i] == "x":
                 self.set_neighbor_sequence_constraints(i, [seq[i]], [])
     
     def set_neighbor_sequence_constraints(self, i, bases, updated):
+        self.dep_graph.node[i]['bases'] = list(set(self.dep_graph.node[i]['bases']) & set(bases))
         updated.append(i)
         for pos in nx.all_neighbors(self.dep_graph, i):
-            possible_bases = []
-            for base in bases:
-                possible_bases.extend(design_utils.get_rcs(base))
-            self.dep_graph.node[i]['bases'] = list(set(self.dep_graph.node[i]['bases']) & set(possible_bases))
             if pos not in updated:
-                self.set_neighbor_sequence_constraints(pos, self.dep_graph.node[i]['bases'], updated)
+                possible_bases = []
+                for base in bases:
+                    possible_bases.extend(design_utils.get_rcs(base))
+                self.set_neighbor_sequence_constraints(pos, possible_bases, updated)
             
     def get_unconstrained_indices(self):
         """
@@ -164,11 +168,13 @@ class SequenceGraph(object):
                 if rindex:
                     self.oligo_pos[roligo][rindex] -= 1
                     self.oligo_len[roligo][rindex] -= 1
-                    mut_array[self.oligo_pos[roligo][rindex]] = ensemble_design.get_random_base()
+                    mutate_pos = self.oligo_pos[roligo][rindex]
+                    mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos + self.seq_offset]['bases'])
                 else:
                     #print self.oligo_pos[roligo]
                     #print self.oligo_len[roligo]
-                    mut_array[self.oligo_pos[roligo][rindex]] = ensemble_design.get_random_base()
+                    mutate_pos = self.oligo_pos[roligo][rindex]
+                    mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos + self.seq_offset]['bases'])
                     self.oligo_pos[roligo][rindex] += 1
                     self.oligo_len[roligo][rindex] += 1 
             self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
@@ -182,7 +188,7 @@ class SequenceGraph(object):
                 rindex = self.index_array[0][int(random.random() * len(self.index_array[0]))]
             else:
                 rindex = self.index_array[1][int(random.random() * len(self.index_array[1]))]
-            rbase = ensemble_design.get_random_base()
+            rbase = ensemble_design.get_random_base(self.dep_graph.node[rindex + self.seq_offset]['bases'])
             mut_array[rindex] = rbase
             self.update_neighbors(rindex, mut_array, [])
             if design_utils.satisfies_constraints(mut_array, self.sequence, self.seq_locks):
@@ -190,9 +196,9 @@ class SequenceGraph(object):
         return ensemble_design.get_sequence_string(mut_array)
 
     def update_neighbors(self, node, mut_array, updated):
-        complement = design_utils.rc(mut_array[node])
         for pos in nx.all_neighbors(self.dep_graph, node + self.seq_offset):
-            mut_array[pos - self.seq_offset] = complement
             if pos not in updated:
+                complement = design_utils.rc(mut_array[node], possible_bases=self.dep_graph.node[pos]['bases'])
+                mut_array[pos - self.seq_offset] = complement
                 updated.append(pos)
                 self.update_neighbors(pos - self.seq_offset, mut_array, updated)

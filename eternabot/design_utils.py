@@ -103,23 +103,22 @@ def get_rcs(base):
     else:
         raise ValueError("invalid base: %s" % base)
 
-def rc(bases, pGU=0.1):
+def rc_single(base, pGU=0.1, possible_bases="AUGC"):
+    complements = get_rcs(base) 
+    if not any([base in possible_bases for base in complements]):
+        raise ValueError("no complements to %s in %s" % (base, str(possible_bases)))
+    if len(complements) > 1:
+        if random.random() < pGU and complements[0] in possible_bases or complements[1] not in possible_bases:
+            return complements[0]
+        else:
+            return complements[1]
+    else:
+        return complements[0] 
+
+def rc(bases, pGU=0.1, possible_bases="AUGC"):
     rc = ""
-    for base in reversed(bases):
-        if base == "G":
-            if random.random() < pGU:
-                rc += "U"
-            else:
-                rc += "C"
-        elif base == "C":
-            rc += "G"
-        elif base == "U":
-            if random.random() < pGU:
-                rc += "G"
-            else:
-                rc += "A"
-        elif base == "A":
-            rc += "U"
+    for base in bases:
+        rc += rc_single(base, pGU, possible_bases)
     return rc
 
 def get_different_base(base):

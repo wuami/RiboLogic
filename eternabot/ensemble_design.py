@@ -103,7 +103,7 @@ def initial_sequence_with_gc_caps(secstruct, sequence_constraints, no_gccap):
     
     return string_sequence
 
-def get_random_base(): 
+def get_random_base(bases = ["A", "U", "G", "C"]): 
     """
     generates random base
     
@@ -113,9 +113,8 @@ def get_random_base():
     returns:
     random base as char
     """
-    #bases = "GAUGCG"
-    bases ="GCAU"
-    randn = int(math.floor(random.random() * 4) % 4)
+    nbases = len(bases)
+    randn = int(math.floor(random.random() * nbases) % nbases)
     return bases[randn]
     
 def get_random_pair():

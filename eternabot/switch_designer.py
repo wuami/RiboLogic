@@ -14,7 +14,7 @@ import sequence_graph
 
 class SwitchDesigner(object):
 
-    def __init__(self, id, type, beginseq, constraints, targets, design_linker, scoring = "bpp", inputs = None, mode = "ghost", oligorc = False):
+    def __init__(self, id, type, beginseq, constraints, targets, design_linker, scoring = "bpp", inputs = None, mode = "ghost", oligorc = False, strandbonus = False, prints = False):
         # sequence information
         self.id = id
         self.type = type
@@ -23,6 +23,8 @@ class SwitchDesigner(object):
         self.n = len(self.sequence)
         self.constraints = constraints
 
+        self.inputs = inputs
+        self.targets = self.parse_targets(targets)
         self.sequence_graph = sequence_graph.SequenceGraph(inputs, targets, constraints, beginseq, oligorc)
 
         # scoring
@@ -41,6 +43,7 @@ class SwitchDesigner(object):
         self.bp_distance_func = design_utils.bp_distance_with_unpaired
         self.greedy = False
         self.oligo_conc = 1e-7
+        self.strandbonus = strandbonus
         #else:
         #    self.bp_distance_func = design_utils.bp_distance_with_constraint
         self.mode = mode
@@ -48,9 +51,7 @@ class SwitchDesigner(object):
             self.hp_mismatch = False
 
         # target information
-        self.targets = targets
         self.n_targets = len(self.targets)
-        self.inputs = inputs
         if "pos" in self.inputs:
             self.input_pos = self.inputs['pos']
             self.input_pos.insert(0,0)
@@ -71,13 +72,14 @@ class SwitchDesigner(object):
             self.free_linkers = True
             self.design_linker = design_linker
             self.oligotail = ""
-        if type == "multi_input" or type == "multi_input_oligo":
-            self.create_target_secstructs()
+        #if type == "multi_input" or type == "multi_input_oligo":
+        #    self.create_target_secstructs()
         self.cotrans = False
         
         # print puzzle info
-        self.prints = False
+        self.prints = prints
         for i in targets:
+            print self.sequence
             print self.get_fold_sequence(self.sequence, i)
             print i['secstruct']
             print i['constrained']
@@ -88,74 +90,86 @@ class SwitchDesigner(object):
         self.update_best()
         self.all_solutions = []
 
-    def create_target_secstructs(self):
-        """ add oligo secstructs to target secstruct """
-        for target in self.targets:
-            if target['type'] == 'oligos' and target['secstruct'] == self.n:
-                # initialize sequences
-                secstruct = ""
-                constrained = ""
-                if self.mode == "ghost":
-                    fold_constraint = ""
-                # get positions of inputs
-                for i,input in enumerate(sorted(self.inputs)):
-                    # add portion of sequence between inputs
-                    secstruct += target['secstruct'][self.input_pos[i]:self.input_pos[i+1]]
-                    constrained += target['constrained'][self.input_pos[i]:self.input_pos[i+1]]
-                    if self.mode == "ghost":
-                        fold_constraint += '.'*(self.input_pos[i+1]-self.input_pos[i])
-                    if self.input_pos[i+1] - self.input_pos[i] != 0:
-                        secstruct += '.'*len(self.design_linker)
-                        if self.free_linkers:
-                            constrained += 'o'*len(self.design_linker)
-                        else:
-                            constrained += 'u'*len(self.design_linker)
-                        if self.mode == "ghost":
-                            fold_constraint += '.'*len(self.design_linker)
-                    # add input sequence
-                    seq = self.inputs[input]
-                    if input in target['inputs']:
-                        constrained += 'o'*len(seq)
-                        if self.mode == "hairpin":
-                            hairpin_len = (len(seq)-4)/2
-                            if self.hp_mismatch:
-                                mismatch = hairpin_len/2
-                                secstruct += '('*(mismatch-1)+'.'+'('*(hairpin_len-mismatch) + '.'*(len(seq)-2*hairpin_len) + ')'*(hairpin_len-mismatch) + '.' + ')'*(mismatch-1)
-                            else:
-                                secstruct += '('*hairpin_len + '.'*(len(seq)-2*hairpin_len) + ')'*hairpin_len
-                        elif self.mode == "ghost":
-                            secstruct += '.'*len(seq)
-                            fold_constraint += 'x'*len(seq)
-                        elif self.mode == "nupack":
-                            secstruct += '.'*len(seq) + '&'
-                            constrained += '&'
-                    elif self.mode != "nupack":
-                        secstruct += '.'*len(seq)
-                        constrained += 'o'*len(seq)
-                        if self.mode == "ghost":
-                            fold_constraint += '.'*len(seq)
-                    # add linker sequence
-                    if self.mode != "nupack" and i != len(self.inputs)-1:
-                        secstruct += '.'*self.linker_length
-                        if self.free_linkers:
-                            constrained += 'o'*self.linker_length
-                        else:
-                            constrained += 'u'*self.linker_length
-                        if self.mode == "ghost":
-                            fold_constraint += '.'*self.linker_length
-                if self.mode != "nupack" and self.input_pos[-1] != len(target['secstruct']):
-                    secstruct += '.'*len(self.design_linker)
-                    if self.free_linkers:
-                        constrained += 'o'*len(self.design_linker)
-                    else:
-                        constrained += 'u'*len(self.design_linker)
-                    if self.mode == "ghost":
-                        fold_constraint += '.'*len(self.design_linker)
-                # add last portion of sequence
-                target['secstruct'] = secstruct + target['secstruct'][self.input_pos[-1]:]
-                target['constrained'] = constrained + target['constrained'][self.input_pos[-1]:]
-                if self.mode == "ghost":
-                    target['fold_constraint'] = fold_constraint + '.'*(self.n-self.input_pos[-1])
+    def parse_targets(self, targets):
+        for target in targets:
+            secstruct = ""
+            constrained = ""
+            if target['type'] == 'oligos' and len(target['inputs']) > 0 and '&' not in target['secstruct']:
+                for input in target['inputs']:
+                    secstruct += '.'*len(self.inputs[input]) + '&'
+                    constrained += 'o'*(len(self.inputs[input])+1)
+                target['secstruct'] = secstruct + target['secstruct']
+                target['constrained'] = constrained + target['constrained']
+        return targets
+
+#    def create_target_secstructs(self):
+#        """ add oligo secstructs to target secstruct """
+#        for target in self.targets:
+#            if target['type'] == 'oligos' and target['secstruct'] == self.n:
+#                # initialize sequences
+#                secstruct = ""
+#                constrained = ""
+#                if self.mode == "ghost":
+#                    fold_constraint = ""
+#                # get positions of inputs
+#                for i,input in enumerate(sorted(self.inputs)):
+#                    # add portion of sequence between inputs
+#                    secstruct += target['secstruct'][self.input_pos[i]:self.input_pos[i+1]]
+#                    constrained += target['constrained'][self.input_pos[i]:self.input_pos[i+1]]
+#                    if self.mode == "ghost":
+#                        fold_constraint += '.'*(self.input_pos[i+1]-self.input_pos[i])
+#                    if self.input_pos[i+1] - self.input_pos[i] != 0:
+#                        secstruct += '.'*len(self.design_linker)
+#                        if self.free_linkers:
+#                            constrained += 'o'*len(self.design_linker)
+#                        else:
+#                            constrained += 'u'*len(self.design_linker)
+#                        if self.mode == "ghost":
+#                            fold_constraint += '.'*len(self.design_linker)
+#                    # add input sequence
+#                    seq = self.inputs[input]
+#                    if input in target['inputs']:
+#                        constrained += 'o'*len(seq)
+#                        if self.mode == "hairpin":
+#                            hairpin_len = (len(seq)-4)/2
+#                            if self.hp_mismatch:
+#                                mismatch = hairpin_len/2
+#                                secstruct += '('*(mismatch-1)+'.'+'('*(hairpin_len-mismatch) + '.'*(len(seq)-2*hairpin_len) + ')'*(hairpin_len-mismatch) + '.' + ')'*(mismatch-1)
+#                            else:
+#                                secstruct += '('*hairpin_len + '.'*(len(seq)-2*hairpin_len) + ')'*hairpin_len
+#                        elif self.mode == "ghost":
+#                            secstruct += '.'*len(seq)
+#                            fold_constraint += 'x'*len(seq)
+#                        elif self.mode == "nupack":
+#                            secstruct += '.'*len(seq) + '&'
+#                            constrained += '&'
+#                    elif self.mode != "nupack":
+#                        secstruct += '.'*len(seq)
+#                        constrained += 'o'*len(seq)
+#                        if self.mode == "ghost":
+#                            fold_constraint += '.'*len(seq)
+#                    # add linker sequence
+#                    if self.mode != "nupack" and i != len(self.inputs)-1:
+#                        secstruct += '.'*self.linker_length
+#                        if self.free_linkers:
+#                            constrained += 'o'*self.linker_length
+#                        else:
+#                            constrained += 'u'*self.linker_length
+#                        if self.mode == "ghost":
+#                            fold_constraint += '.'*self.linker_length
+#                if self.mode != "nupack" and self.input_pos[-1] != len(target['secstruct']):
+#                    secstruct += '.'*len(self.design_linker)
+#                    if self.free_linkers:
+#                        constrained += 'o'*len(self.design_linker)
+#                    else:
+#                        constrained += 'u'*len(self.design_linker)
+#                    if self.mode == "ghost":
+#                        fold_constraint += '.'*len(self.design_linker)
+#                # add last portion of sequence
+#                target['secstruct'] = secstruct + target['secstruct'][self.input_pos[-1]:]
+#                target['constrained'] = constrained + target['constrained'][self.input_pos[-1]:]
+#                if self.mode == "ghost":
+#                    target['fold_constraint'] = fold_constraint + '.'*(self.n-self.input_pos[-1])
 
     def get_fold_sequence(self, sequence, objective):
         """ append oligo sequences separated by & for type oligo """
@@ -336,7 +350,7 @@ class SwitchDesigner(object):
         sum of bp distances with and without the oligo 
         """
         distance = 0.0
-        strands_bonus = 0.0
+        strands_interacting = 0.0
         n_strands = 0.0
         for i in range(self.n_targets):
             if "threshold" in self.targets[i]:
@@ -346,13 +360,16 @@ class SwitchDesigner(object):
             if self.mode == "nupack":
                 strands = secstruct[i][0].split("&")
                 for strand in secstruct[i][1]:
-                    n_strands += 1
-                    if strand != len(strands) and "(" in strands[strand]:
-                        strands_bonus += 1
+                    if strand != len(strands):
+                        n_strands += 1
+                        if "(" in strands[strand-1] or ")" in strands[strand-1]:
+                            strands_interacting += 1
             if self.prints:
                 print distance,
-        if strands_bonus:
-            distance /= strands_bonus/n_strands
+        if self.strandbonus:
+            if strands_interacting == 0:
+                strands_interacting += 1
+            distance /= strands_interacting/n_strands
             if self.prints:
                 print "bonus: %d" % distance
         return distance
@@ -413,6 +430,7 @@ class SwitchDesigner(object):
             # pick random nucleotide in sequence
             mut_sequence = self.sequence_graph.mutate(self.sequence)
             [mut_sequence, native, bp_distance, fold_sequences] = self.get_sequence_info(mut_sequence)
+            print self.bp_distance, bp_distance
 
             if self.best_bp_distance != 0 and bp_distance == 0:
                 print i
@@ -427,7 +445,6 @@ class SwitchDesigner(object):
                 if self.bp_distance == bp_distance and self.design_score != 0 and random.random() > p_dist(self.design_score, score):
                     continue
                 self.update_folds(mut_sequence, native, bp_distance, score)
-                print self.oligo_pos
                 if self.prints:
                     print self.sequence, self.bp_distance, self.design_score
                     print "conc: %s" % self.oligo_conc
