@@ -1,28 +1,40 @@
 import ensemble_design, design_utils, eterna_utils
 import random
 import networkx as nx
+import matplotlib.pyplot as plt
+import sys
+
+base_coloring = {'A':'y', 'U':'b', 'G':'r', 'C':'g', '&':'w'}
 
 class SequenceGraph(object):
 
-    def __init__(self, inputs, targets, seq_constraints, sequence, oligorc):
+    def __init__(self, inputs, targets, seq_locks, sequence, oligorc, print_=False):
         self.inputs = inputs
         self.targets = targets
-        self.seq_locks = seq_constraints
-        self.sequence = sequence
-        self.seq_constraints = sequence
+        self.seq_locks = self._get_full_seqlocks(seq_locks)
+        self.sequence = self._get_full_sequence(sequence)
         self.n = len(sequence)
+        self.N = len(self.sequence)
 
         self.index_array = self.get_unconstrained_indices()
         self.dep_graph = self.get_dependency_graph()
-        #for node in self.dep_graph.nodes():
-        #    print node, self.dep_graph.node[node]['bases']
-        #    for pos in nx.all_neighbors(self.dep_graph, node):
-        #        print "\t", pos, self.dep_graph.node[pos]['bases']
+
         seq_array = ensemble_design.get_sequence_array(self.sequence)
-        for i in range(self.n):
+        for i in range(self.N):
             if self.seq_locks[i] == "x":
                 self.update_neighbors(i, seq_array, [])
-        self.sequence = ensemble_design.get_sequence_string(self.sequence)
+        self.sequence = ensemble_design.get_sequence_string(seq_array)
+        self.print_ = print_
+        if self.print_:
+            self.printi = 0
+            ## draw dependency graph, for debugging
+            nx.draw_circular(self.dep_graph, with_labels=True, node_color=[base_coloring[base] for base in self.sequence], node_size=60, font_size=5)
+            plt.savefig("dependency_graph%s.png" % self.printi, dpi=300)
+            self.printi += 1
+            #for node in self.dep_graph.nodes():
+            #    print node, self.dep_graph.node[node]['bases']
+            #    for pos in nx.all_neighbors(self.dep_graph, node):
+            #        print "\t", pos, self.dep_graph.node[pos]['bases']
         
         if oligorc:
             self.set_oligo_rcs()
@@ -31,7 +43,12 @@ class SequenceGraph(object):
             self.mutate_func = self.mutate_sequence
 
     def reset_sequence(self, sequence):
-        self.sequence = sequence
+        self.sequence = self._get_full_sequence(sequence)
+        seq_array = ensemble_design.get_sequence_array(self.sequence)
+        for i in range(self.N):
+            if self.seq_locks[i] == "x":
+                self.update_neighbors(i, seq_array, [])
+        self.sequence = ensemble_design.get_sequence_string(seq_array)
         self.set_oligo_rcs()
 
     def set_oligo_rcs(self):
@@ -40,8 +57,10 @@ class SequenceGraph(object):
         self.oligo_len = []
         self.oligo_len_sum = 0
         inputs = self.inputs.values()
-        self.set_oligo_rc(inputs[0], [0,len(inputs[0])])
-        self.set_oligo_rc(inputs[1], [self.n-len(inputs[1]), self.n])
+        oligo1_start = [x + self.seq_offset for x in [0, len(inputs[0])]]
+        self.set_oligo_rc(inputs[0], oligo1_start)
+        oligo2_start = [x + self.seq_offset for x in [self.n-len(inputs[1]), self.n]]
+        self.set_oligo_rc(inputs[1], oligo2_start)
 
     def set_oligo_rc(self, seq, range):
         """ set oligo rc parameters for shifting complement sequece"""
@@ -53,7 +72,7 @@ class SequenceGraph(object):
         self.oligo_len.append([0,range[1]-range[0]-1])
         self.oligo_len_sum += len(seq)
 
-    def get_padded_secstruct(self, secstruct, inputs):
+    def _get_full_secstruct(self, secstruct, inputs):
         substrings = secstruct.split('&')
         secstruct = ""
         i = 0
@@ -65,6 +84,18 @@ class SequenceGraph(object):
                 secstruct += '.'*len(self.inputs[input]) + '&'
         return secstruct + substrings[-1]
         
+    def _get_full_seqlocks(self, seq_locks):
+        constraint = ""
+        for input in sorted(self.inputs):
+            constraint += "x"*len(self.inputs[input]) + "o"
+        return constraint + seq_locks
+    
+    def _get_full_sequence(self, sequence):
+        seq = ""
+        for input in sorted(self.inputs):
+            seq += self.inputs[input] + "&"
+        return seq + sequence
+
     def get_dependency_graph(self):
         """ get dependency graph based on target secondary structures """
         # position of start of actual sequence in graph
@@ -72,10 +103,10 @@ class SequenceGraph(object):
 
         # create graph
         graph = nx.Graph()
-        graph.add_nodes_from(range(self.n + self.seq_offset), bases=['A','U','G','C'])
+        graph.add_nodes_from(range(self.N), bases=['A','U','G','C'])
         for target in self.targets:
-            target['padded_secstruct'] = self.get_padded_secstruct(target['secstruct'], target['inputs'])
-            pairmap = eterna_utils.get_pairmap_from_secstruct(target['padded_secstruct'])
+            target['full_secstruct'] = self._get_full_secstruct(target['secstruct'], target['inputs'])
+            pairmap = eterna_utils.get_pairmap_from_secstruct(target['full_secstruct'])
             for i, j in enumerate(pairmap):
                 if j > i:
                     graph.add_edge(i,j)
@@ -86,16 +117,9 @@ class SequenceGraph(object):
         return graph
 
     def set_sequence_constraints(self):
-        constraint = ""
-        seq = ""
-        for input in sorted(self.inputs):
-            seq += self.inputs[input] + "&"
-            constraint += "x"*len(self.inputs[input]) + "o"
-        constraint += self.seq_locks
-        seq += self.sequence
-        for i in range(len(constraint)):
-            if constraint[i] == "x":
-                self.set_neighbor_sequence_constraints(i, [seq[i]], [])
+        for i in range(len(self.seq_locks)):
+            if self.seq_locks[i] == "x":
+                self.set_neighbor_sequence_constraints(i, [self.sequence[i]], [])
     
     def set_neighbor_sequence_constraints(self, i, bases, updated):
         self.dep_graph.node[i]['bases'] = list(set(self.dep_graph.node[i]['bases']) & set(bases))
@@ -120,18 +144,25 @@ class SequenceGraph(object):
                 restricted.append(ii)
         return [open, restricted]
 
-    def mutate(self, sequence):
-        return self.mutate_func(sequence)
+    def mutate(self):
+        self.sequence = self.mutate_func()
+        if self.print_:
+            if self.printi <= 20:
+                ## draw dependency graph, for debugging
+                nx.draw_circular(self.dep_graph, with_labels=True, node_color=[base_coloring[base] for base in self.sequence], node_size=60, font_size=5)
+                plt.savefig("dependency_graph%s.png" % self.printi, dpi=300)
+                self.printi += 1
+        return self.sequence[-self.n:]
 
-    def mutate_or_shift(self, sequence):
+    def mutate_or_shift(self):
         """
         either mutate sequence or shift the complement to the oligo in the design sequence
         """
-        mut_array = ensemble_design.get_sequence_array(self.sequence)
         # mutate randomly wp 0.5, otherwise mutate oligo rc
         if (random.random() > 0.8): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
-            return self.mutate_sequence(sequence)
+            return self.mutate_sequence(self.sequence)
         else:
+            mut_array = ensemble_design.get_sequence_array(self.sequence)
             # randomly choose an oligo
             roligo = random.getrandbits(1)
 
@@ -147,7 +178,6 @@ class SequenceGraph(object):
                  self.oligo_len[roligo][0] <= 0 or self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
                 rindex = 1
                 maxed_out = maxed_out and True
-            print rindex
             if 'rindex' not in locals():
                 rindex = random.getrandbits(1)
             # wp 0.5 expand
@@ -169,18 +199,18 @@ class SequenceGraph(object):
                     self.oligo_pos[roligo][rindex] -= 1
                     self.oligo_len[roligo][rindex] -= 1
                     mutate_pos = self.oligo_pos[roligo][rindex]
-                    mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos + self.seq_offset]['bases'])
+                    mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos]['bases'])
                 else:
                     #print self.oligo_pos[roligo]
                     #print self.oligo_len[roligo]
                     mutate_pos = self.oligo_pos[roligo][rindex]
-                    mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos + self.seq_offset]['bases'])
+                    mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos]['bases'])
                     self.oligo_pos[roligo][rindex] += 1
                     self.oligo_len[roligo][rindex] += 1 
             self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
         return ensemble_design.get_sequence_string(mut_array)
 
-    def mutate_sequence(self, sequence):
+    def mutate_sequence(self):
         """ mutate one random position """
         while True:
             mut_array = ensemble_design.get_sequence_array(self.sequence)
@@ -188,7 +218,7 @@ class SequenceGraph(object):
                 rindex = self.index_array[0][int(random.random() * len(self.index_array[0]))]
             else:
                 rindex = self.index_array[1][int(random.random() * len(self.index_array[1]))]
-            rbase = ensemble_design.get_random_base(self.dep_graph.node[rindex + self.seq_offset]['bases'])
+            rbase = ensemble_design.get_random_base(self.dep_graph.node[rindex]['bases'])
             mut_array[rindex] = rbase
             self.update_neighbors(rindex, mut_array, [])
             if design_utils.satisfies_constraints(mut_array, self.sequence, self.seq_locks):
@@ -196,9 +226,9 @@ class SequenceGraph(object):
         return ensemble_design.get_sequence_string(mut_array)
 
     def update_neighbors(self, node, mut_array, updated):
-        for pos in nx.all_neighbors(self.dep_graph, node + self.seq_offset):
+        for pos in nx.all_neighbors(self.dep_graph, node):
             if pos not in updated:
                 complement = design_utils.rc(mut_array[node], possible_bases=self.dep_graph.node[pos]['bases'])
-                mut_array[pos - self.seq_offset] = complement
+                mut_array[pos] = complement
                 updated.append(pos)
-                self.update_neighbors(pos - self.seq_offset, mut_array, updated)
+                self.update_neighbors(pos, mut_array, updated)

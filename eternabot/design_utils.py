@@ -103,9 +103,9 @@ def get_rcs(base):
     else:
         raise ValueError("invalid base: %s" % base)
 
-def rc_single(base, pGU=0.1, possible_bases="AUGC"):
+def rc_single(base, pGU=0.2, possible_bases="AUGC"):
     complements = get_rcs(base) 
-    if not any([base in possible_bases for base in complements]):
+    if not any([b in possible_bases for b in complements]):
         raise ValueError("no complements to %s in %s" % (base, str(possible_bases)))
     if len(complements) > 1:
         if random.random() < pGU and complements[0] in possible_bases or complements[1] not in possible_bases:
@@ -115,7 +115,7 @@ def rc_single(base, pGU=0.1, possible_bases="AUGC"):
     else:
         return complements[0] 
 
-def rc(bases, pGU=0.1, possible_bases="AUGC"):
+def rc(bases, pGU=0.2, possible_bases="AUGC"):
     rc = ""
     for base in bases:
         rc += rc_single(base, pGU, possible_bases)

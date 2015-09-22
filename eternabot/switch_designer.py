@@ -14,7 +14,7 @@ import sequence_graph
 
 class SwitchDesigner(object):
 
-    def __init__(self, id, type, beginseq, constraints, targets, design_linker, scoring = "bpp", inputs = None, mode = "ghost", oligorc = False, strandbonus = False, prints = False):
+    def __init__(self, id, type, beginseq, constraints, targets, design_linker, scoring = "bpp", inputs = None, mode = "ghost", oligorc = False, strandbonus = False, print_ = False):
         # sequence information
         self.id = id
         self.type = type
@@ -25,7 +25,7 @@ class SwitchDesigner(object):
 
         self.inputs = inputs
         self.targets = self.parse_targets(targets)
-        self.sequence_graph = sequence_graph.SequenceGraph(inputs, targets, constraints, beginseq, oligorc)
+        self.sequence_graph = sequence_graph.SequenceGraph(inputs, targets, constraints, beginseq, oligorc, print_)
 
         # scoring
         if scoring == "bpp":
@@ -77,7 +77,7 @@ class SwitchDesigner(object):
         self.cotrans = False
         
         # print puzzle info
-        self.prints = prints
+        self.print_ = print_
         for i in targets:
             print self.sequence
             print self.get_fold_sequence(self.sequence, i)
@@ -364,13 +364,13 @@ class SwitchDesigner(object):
                         n_strands += 1
                         if "(" in strands[strand-1] or ")" in strands[strand-1]:
                             strands_interacting += 1
-            if self.prints:
+            if self.print_:
                 print distance,
         if self.strandbonus:
             if strands_interacting == 0:
                 strands_interacting += 1
             distance /= strands_interacting/n_strands
-            if self.prints:
+            if self.print_:
                 print "bonus: %d" % distance
         return distance
 
@@ -388,7 +388,7 @@ class SwitchDesigner(object):
         return self.score_secstructs(self.best_native) == 0 and self.oligo_conc == self.target_oligo_conc
 
 
-    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, prints = None, target_oligo_conc=1e-7):
+    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, print_ = None, target_oligo_conc=1e-7):
         """
         monte-carlo optimization of the sequence
 
@@ -403,8 +403,8 @@ class SwitchDesigner(object):
             self.greedy = greedy
         if cotrans != None:
             self.cotrans = cotrans
-        if prints != None:
-            self.prints = prints
+        if print_ != None:
+            self.print_ = print_
 
         #print self.targets
         #self.optimize_start_sequence()
@@ -428,9 +428,8 @@ class SwitchDesigner(object):
             #random.shuffle(index_array)
             
             # pick random nucleotide in sequence
-            mut_sequence = self.sequence_graph.mutate(self.sequence)
+            mut_sequence = self.sequence_graph.mutate()
             [mut_sequence, native, bp_distance, fold_sequences] = self.get_sequence_info(mut_sequence)
-            print self.bp_distance, bp_distance
 
             if self.best_bp_distance != 0 and bp_distance == 0:
                 print i
@@ -445,7 +444,7 @@ class SwitchDesigner(object):
                 if self.bp_distance == bp_distance and self.design_score != 0 and random.random() > p_dist(self.design_score, score):
                     continue
                 self.update_folds(mut_sequence, native, bp_distance, score)
-                if self.prints:
+                if self.print_:
                     print self.sequence, self.bp_distance, self.design_score
                     print "conc: %s" % self.oligo_conc
                     for j in range(self.n_targets):
