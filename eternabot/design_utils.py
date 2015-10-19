@@ -31,6 +31,8 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
     # generate pair mappings
     if order1:
         pairmap1 = eterna_utils.get_pairmap_from_secstruct([secstruct1, order1])
+        ss_list = secstruct1.split('&')
+        secstruct1 = "&".join([ss_list[order1.index(x)] for x in range(1,len(order1)+1)])
     else:
         pairmap1 = eterna_utils.get_pairmap_from_secstruct(secstruct1)
     pairmap2 = eterna_utils.get_pairmap_from_secstruct(secstruct2)
@@ -43,12 +45,16 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
         if(locks[i] == "u"):
             if(secstruct1[i] == secstruct2[i]):
                 umatch += 1
+        elif locks[i] == "p":
+            if secstruct1[i] in ['(', ')']:
+                umatch += 1
         elif locks[i] == "x":
             if(pairmap1[i] != pairmap2[i]):
-                if(pairmap1[i] > i):
-                    dist += 1
-                if(pairmap2[i] > i):
-                    dist += 1
+                dist += 1
+                #if(pairmap1[i] > i):
+                #    dist += 1
+                #if(pairmap2[i] > i):
+                #    dist += 1
         else:
             continue
         if i == threshold[j][1]:
@@ -173,8 +179,47 @@ class Scorer():
             else:
                 self.MS2.append(True)
                 self.indices = [i, i+18]
+        if not any(self.MS2):
+            self.scoring_func = self.pair_score
+            for target in targets:
+                pair_list = []
+                stack = []
+                for i in range(len(target['secstruct'])):
+                    if target['constrained'][i] == "x":
+                        if target['secstruct'][i] == "(":
+                            stack.append(i)
+                        elif target['secstruct'][i] == ")":
+                            j = stack.pop()
+                            pair_list.append([i,j])
+                        elif target['secstruct'][i] == ".":
+                            pair_list.append(-i)
+                    elif target['constrained'][i] == "p":
+                        pair_list.append(i)
+                self.indices.append(pair_list)
+        else:
+            self.scoring_func = self.MS2_score
 
-    def score(self, designs):
+    def pair_score(self, designs):
+        score = 0.0
+        for i, design in enumerate(designs):
+            n = len(design['sequence'])
+            pair_list = self.indices[i]
+            for item in pair_list:
+                if isinstance(item, list):
+                    values = [pair[2] for pair in design['dotplot'] if (pair[0] == item[0] and pair[1] == item[1])]
+                    if len(values) != 0:
+                        score += sum(values)
+                elif item < 0:
+                    values = [pair[2] for pair in design['dotplot'] if (pair[0] == -item and pair[1] == n)]
+                    if len(values) != 0:
+                        score += sum(values)
+                else:
+                    values = [pair[2] for pair in design['dotplot'] if (item in pair and n not in pair)]
+                    if len(values) != 0:
+                        score += sum(values)
+        return score
+
+    def MS2_score(self, designs):
         score = 0.0
         for i,design in enumerate(designs):
             p = [pair for pair in design['dotplot'] if (pair[0] == self.indices[0] and pair[1] == self.indices[1])]
@@ -187,6 +232,9 @@ class Scorer():
             else:
                 score -= p
         return score*len(designs[0]['sequence'])/len(designs)
+
+    def score(self, designs):
+        return self.scoring_func(designs)
             
 def get_bpp_scoring_func(targets): 
     s = Scorer(targets)

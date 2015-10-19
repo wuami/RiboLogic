@@ -25,7 +25,8 @@ class SwitchDesigner(object):
 
         self.inputs = inputs
         self.targets = self.parse_targets(targets)
-        self.sequence_graph = sequence_graph.SequenceGraph(inputs, targets, constraints, beginseq, oligorc, print_)
+        self.sequence_graph = sequence_graph.SequenceGraph(inputs, targets, constraints, beginseq, oligorc, False, autocomplement=False)
+        self.target_oligo_conc = 1e-7
 
         # scoring
         if scoring == "bpp":
@@ -79,7 +80,6 @@ class SwitchDesigner(object):
         # print puzzle info
         self.print_ = print_
         for i in targets:
-            print self.sequence
             print self.get_fold_sequence(self.sequence, i)
             print i['secstruct']
             print i['constrained']
@@ -253,21 +253,21 @@ class SwitchDesigner(object):
         """
         # in a small number of cases, get_design function causes error
         # if this happens, assume 0 score
-        try:
-            if not self.scoring_func:
-                return 0
-            designs = []
-            for i in range(self.n_targets):
-                if self.mode == "ghost":
-                    designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i], self.targets[i]['fold_constraint']))
-                elif self.mode == "nupack":
-                    designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i], nupack=True))
-                else:
-                    designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i]))
-            score = self.scoring_func(designs)
-            return score
-        except:
+        #try:
+        if not self.scoring_func:
             return 0
+        designs = []
+        for i in range(self.n_targets):
+            if self.mode == "ghost":
+                designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i], self.targets[i]['fold_constraint']))
+            elif self.mode == "nupack":
+                designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i], nupack=self.oligo_conc))
+            else:
+                designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i]))
+        score = self.scoring_func(designs)
+        return score
+        #except:
+        #    return 0
 
     def get_hairpin(self, seq, begin, mismatch):
         """ turn sequence into hairpin """
@@ -388,7 +388,7 @@ class SwitchDesigner(object):
         return self.score_secstructs(self.best_native) == 0 and self.oligo_conc == self.target_oligo_conc
 
 
-    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, print_ = None, target_oligo_conc=1e-7):
+    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, print_ = None, start_oligo_conc=1):
         """
         monte-carlo optimization of the sequence
 
@@ -410,8 +410,7 @@ class SwitchDesigner(object):
         #self.optimize_start_sequence()
 
         T = 5.0
-        self.target_oligo_conc = target_oligo_conc
-        self.oligo_conc = 1.0
+        self.oligo_conc = start_oligo_conc
 
         def p_dist(dist, new_dist):
             """probability function"""
@@ -422,6 +421,11 @@ class SwitchDesigner(object):
                 return 1
             else:
                 return 0
+
+        if self.greedy:
+            p_func = p_greedy
+        else:
+            p_func = p_dist
 
         # loop as long as bp distance too large or design score too small
         for i in range(n_iterations):
@@ -435,13 +439,10 @@ class SwitchDesigner(object):
                 print i
             
             # if distance or score is better for mutant, update the current sequence
-            if self.greedy:
-                p = p_greedy(self.bp_distance, bp_distance)
-            else:
-                p = p_dist(self.bp_distance, bp_distance)
+            p = p_func(self.bp_distance, bp_distance)
             if(random.random() <= p):
                 score = max(self.get_design_score(fold_sequences, native),0)
-                if self.bp_distance == bp_distance and self.design_score != 0 and random.random() > p_dist(self.design_score, score):
+                if self.bp_distance == bp_distance and p_func(self.design_score, score):
                     continue
                 self.update_folds(mut_sequence, native, bp_distance, score)
                 if self.print_:
@@ -449,6 +450,7 @@ class SwitchDesigner(object):
                     print "conc: %s" % self.oligo_conc
                     for j in range(self.n_targets):
                         print self.native[j]
+                    print ""
                         #print self.get_fold_sequence(self.sequence, self.targets[j])
             
                 # if distance or score is better for mutant than best, update the best sequence    
@@ -467,9 +469,9 @@ class SwitchDesigner(object):
             
             # update oligo_conc
             if self.best_bp_distance == 0:
-                if self.oligo_conc > target_oligo_conc:
-                    if self.oligo_conc/10 <= target_oligo_conc:
-                        self.oligo_conc = target_oligo_conc
+                if self.oligo_conc > self.target_oligo_conc:
+                    if self.oligo_conc/10 <= self.target_oligo_conc:
+                        self.oligo_conc = self.target_oligo_conc
                     else:
                         self.oligo_conc /= 10
                 self.update_folds(self.sequence)

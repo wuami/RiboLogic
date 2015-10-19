@@ -2,7 +2,7 @@ import sys, os
 import random, string
 import vienna_parameters
 import subprocess
-import eterna_utils
+#import eterna_utils
 import random
 import re
 from subprocess import Popen, PIPE, STDOUT, check_call
@@ -53,7 +53,7 @@ def fold(seq, cotransc=False, constraint=False):
 
 def nupack_fold(seq, oligo_conc, bpp = False):
     """
-    folds sequence using nupack
+    finds most prevalent structure using nupack partition function
     """
     os.system("source ~/.bashrc")
     rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
@@ -78,20 +78,22 @@ def nupack_fold(seq, oligo_conc, bpp = False):
     with open("%s.eq" % rand_string) as f_eq:
         for line in f_eq:
             if not line.startswith("%"):
-                mfe = line.strip().split()
-                if int(mfe[-3]):
+                complex = line.strip().split()
+                if int(complex[len(split)+1]) and not bpp:
+                    break
+                if all([int(x) for x in complex[2:(2+len(split))]]) and bpp:
                     break
     # get strand ordering
     with open("%s.ocx-key" % rand_string) as f_key:
         for line in f_key:
-            if line.startswith("%s\t%s" % (mfe[0], mfe[1])):
+            if line.startswith("%s\t%s" % (complex[0], complex[1])):
                 strands = [int(x) for x in line.strip().split()[2:]]
                 break
     # get mfe structure
     with open("%s.ocx-mfe" % rand_string) as f_mfe:
         line = f_mfe.readline()
         while line:
-            if line.startswith("%% complex%s-order%s" % (mfe[0], mfe[1])):
+            if line.startswith("%% complex%s-order%s" % (complex[0], complex[1])):
                 f_mfe.readline()
                 energy = f_mfe.readline().strip()
                 secstruct = f_mfe.readline().strip()
@@ -107,8 +109,11 @@ def nupack_fold(seq, oligo_conc, bpp = False):
                     f_pairs.readline()
                     line = f_pairs.readline()
                     while not line.startswith("%"):
-                        bpp_matrix.append(line.strip().split())
-                line = f_mfe.readline()
+                        bp = line.strip().split()
+                        bpp_matrix.append([int(bp[0]), int(bp[1]), float(bp[2])])
+                        line = f_pairs.readline()
+                    break
+                line = f_pairs.readline()
         os.system("rm %s*" % rand_string)
         return bpp_matrix
 
@@ -120,21 +125,21 @@ def nupack_fold(seq, oligo_conc, bpp = False):
     os.system("rm %s*" % rand_string)
     return [secstruct.replace("+", "&"), energy, strands]
 
-def fill_gc(elem , pair_map , seq, rand ):
-    if(elem.type_ != eterna_utils.RNAELEMENT_STACK):
-        return
-    indices = elem.indices_
-    length = len(indices)
-    for ii in range(0,length):
-        idx = indices[ii]
-        if(pair_map[idx]<idx):
-            continue
-        if(rand.randint(0,1)==0):
-            seq[idx]="G"
-            seq[pair_map[idx]]="C"
-        else:
-            seq[idx]="C"
-            seq[pair_map[idx]]="G"
+#def fill_gc(elem , pair_map , seq, rand ):
+#    if(elem.type_ != eterna_utils.RNAELEMENT_STACK):
+#        return
+#    indices = elem.indices_
+#    length = len(indices)
+#    for ii in range(0,length):
+#        idx = indices[ii]
+#        if(pair_map[idx]<idx):
+#            continue
+#        if(rand.randint(0,1)==0):
+#            seq[idx]="G"
+#            seq[pair_map[idx]]="C"
+#        else:
+#            seq[idx]="C"
+#            seq[pair_map[idx]]="G"
 
 def tout():
     thread.interrupt_main()

@@ -9,6 +9,7 @@ import re
 import imp
 import settings
 import subprocess
+import inv_utils
 
 UNSCORABLE = -99999
 
@@ -160,6 +161,8 @@ def get_pairmap_from_secstruct(secstruct):
         secstruct = secstruct[0]
     pair_stack = []
     end_stack = []
+    pk_pair_stack = []
+    pk_end_stack = []
     pairs_array = []
     i_range = range(0,len(secstruct))
 
@@ -176,6 +179,15 @@ def get_pairmap_from_secstruct(secstruct):
                 end_stack.append(ii)
             else:
                 index = pair_stack.pop()
+                pairs_array[index] = ii
+                pairs_array[ii] = index
+        elif secstruct[ii] == "[":
+            pk_pair_stack.append(ii)
+        elif secstruct[ii] == "]":
+            if not pk_pair_stack:
+                pk_end_stack.append(ii)
+            else:
+                index = pk_pair_stack.pop()
                 pairs_array[index] = ii
                 pairs_array[ii] = index
     if len(pair_stack) == len(end_stack):
@@ -480,7 +492,7 @@ def fill_energy(elements,sequence,pairmap):
 def get_dotplot(sequence, nupack=False, constraint=False):
     """ run ViennaRNA to get bp probability matrix """
     if nupack:
-        return inv_utils.nupack_fold(sequence, bpp=True)
+        return inv_utils.nupack_fold(sequence, nupack, bpp=True)
     filename = "".join(random.sample(string.lowercase,5))
     with open(filename+".fa",'w') as f:
         f.write(">%s\n" % filename)

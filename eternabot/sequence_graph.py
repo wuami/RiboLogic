@@ -8,26 +8,28 @@ base_coloring = {'A':'y', 'U':'b', 'G':'r', 'C':'g', '&':'w'}
 
 class SequenceGraph(object):
 
-    def __init__(self, inputs, targets, seq_locks, sequence, oligorc, print_=False):
+    def __init__(self, inputs, targets, seq_locks, sequence, oligorc, draw=False, autocomplement=True):
         self.inputs = inputs
         self.targets = targets
         self.seq_locks = self._get_full_seqlocks(seq_locks)
         self.sequence = self._get_full_sequence(sequence)
         self.n = len(sequence)
         self.N = len(self.sequence)
+        self.autocomplement = autocomplement
 
         self.index_array = self.get_unconstrained_indices()
         self.dep_graph = self.get_dependency_graph()
 
         seq_array = ensemble_design.get_sequence_array(self.sequence)
-        for i in range(self.N):
-            if self.seq_locks[i] == "x":
-                self.update_neighbors(i, seq_array, [])
+        if self.autocomplement:
+            for i in range(self.N):
+                if self.seq_locks[i] == "x":
+                    self.update_neighbors(i, seq_array, [])
         self.sequence = ensemble_design.get_sequence_string(seq_array)
-        self.print_ = print_
-        if self.print_:
+        self.draw = draw
+        if self.draw:
             self.printi = 0
-            ## draw dependency graph, for debugging
+            # draw dependency graph, for debugging
             nx.draw_circular(self.dep_graph, with_labels=True, node_color=[base_coloring[base] for base in self.sequence], node_size=60, font_size=5)
             plt.savefig("dependency_graph%s.png" % self.printi, dpi=300)
             self.printi += 1
@@ -36,6 +38,7 @@ class SequenceGraph(object):
             #    for pos in nx.all_neighbors(self.dep_graph, node):
             #        print "\t", pos, self.dep_graph.node[pos]['bases']
         
+        self.oligorc = oligorc
         if oligorc:
             self.set_oligo_rcs()
             self.mutate_func = self.mutate_and_shift
@@ -45,11 +48,13 @@ class SequenceGraph(object):
     def reset_sequence(self, sequence):
         self.sequence = self._get_full_sequence(sequence)
         seq_array = ensemble_design.get_sequence_array(self.sequence)
-        for i in range(self.N):
-            if self.seq_locks[i] == "x":
-                self.update_neighbors(i, seq_array, [])
+        if self.autocomplement:
+            for i in range(self.N):
+                if self.seq_locks[i] == "x":
+                    self.update_neighbors(i, seq_array, [])
         self.sequence = ensemble_design.get_sequence_string(seq_array)
-        self.set_oligo_rcs()
+        if self.oligorc:
+            self.set_oligo_rcs()
 
     def set_oligo_rcs(self):
         self.oligo_rc = []
@@ -113,7 +118,8 @@ class SequenceGraph(object):
         if not nx.is_bipartite(graph):
             raise ValueError("dependency graph is not bipartite")
         self.dep_graph = graph
-        self.set_sequence_constraints()
+        if self.autocomplement:
+            self.set_sequence_constraints()
         return graph
 
     def set_sequence_constraints(self):
@@ -137,7 +143,7 @@ class SequenceGraph(object):
         """
         open = []
         restricted = []
-        for ii in range(0,self.n):
+        for ii in range(0,self.N):
             if(self.seq_locks[ii] == "o"):
                 open.append(ii)
             elif self.seq_locks[ii] == "r":
@@ -146,7 +152,7 @@ class SequenceGraph(object):
 
     def mutate(self):
         self.sequence = self.mutate_func()
-        if self.print_:
+        if self.draw:
             if self.printi <= 20:
                 ## draw dependency graph, for debugging
                 nx.draw_circular(self.dep_graph, with_labels=True, node_color=[base_coloring[base] for base in self.sequence], node_size=60, font_size=5)
@@ -220,7 +226,8 @@ class SequenceGraph(object):
                 rindex = self.index_array[1][int(random.random() * len(self.index_array[1]))]
             rbase = ensemble_design.get_random_base(self.dep_graph.node[rindex]['bases'])
             mut_array[rindex] = rbase
-            self.update_neighbors(rindex, mut_array, [])
+            if self.autocomplement:
+                self.update_neighbors(rindex, mut_array, [])
             if design_utils.satisfies_constraints(mut_array, self.sequence, self.seq_locks):
                 break
         return ensemble_design.get_sequence_string(mut_array)

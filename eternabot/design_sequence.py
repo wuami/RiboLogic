@@ -35,6 +35,12 @@ def get_objective_dict(o):
             for j in range(lo, hi+1):
                 constrained[j] = 'u'
         del o['structure_unpaired_constrained_bases']
+    if 'structure_paired_constrained_bases' in o.keys() and len(o['structure_paired_constrained_bases']) > 0:
+        for i in range(0, len(o['structure_paired_constrained_bases']), 2):
+            [lo, hi] = o['structure_paired_constrained_bases'][i:i+2]
+            for j in range(lo, hi+1):
+                constrained[j] = 'p'
+        del o['structure_paired_constrained_bases']
     o['secstruct'] = ensemble_design.get_sequence_string(struct)
     o['constrained'] = ensemble_design.get_sequence_string(constrained)
     return o
@@ -87,7 +93,7 @@ def optimize_n(puzzle, niter, ncool, n, **kwargs):#submit, draw, fout, cotrans, 
     attempts = 0
     while i < n:
         puzzle.reset_sequence()
-        passkwargs = {key:kwargs[key] for key in ['greedy', 'cotrans']}
+        passkwargs = {key:kwargs[key] for key in ['greedy', 'cotrans', 'start_oligo_conc']}
         puzzle.optimize_sequence(niter, ncool, **passkwargs)#greedy=greedy, cotrans=cotrans, print_=print_)
         if puzzle.check_current_secstructs():
             sol = puzzle.get_solution()
@@ -188,9 +194,10 @@ def main():
     p.add_argument('puzzleid', help="name of puzzle filename or eterna id number", type=str)
     p.add_argument('-n', '--nsol', help="number of solutions", type=int, default=1)
     p.add_argument('-i', '--niter', help="number of iterations", type=int, default=2000)
-    p.add_argument('-c', '--ncool', help="number of times to cool", type=int, default=50)
+    p.add_argument('-o', '--ncool', help="number of times to cool", type=int, default=50)
     p.add_argument('-m', '--mode', help="mode for multi inputs", type=str, default="hairpin")
     p.add_argument('-s', '--score', help="scoring function", type=str, default="bpp")
+    p.add_argument('-c', '--conc', help="starting oligo concentration", type=float, default=1e-7)
     p.add_argument('--submit', help="submit the solution(s)", default=False, action='store_true')
     p.add_argument('--draw', help="draw the solution(s)", default=False, action='store_true')
     p.add_argument('--nowrite', help="suppress write to file", default=False, action='store_true')
@@ -215,7 +222,7 @@ def main():
     #view_sequence(puzzle, seq)
 
     # find solutions
-    [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, submit=args.submit, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy)
+    [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, submit=args.submit, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
 
 if __name__ == "__main__":
     #unittest.main()
