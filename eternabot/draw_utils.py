@@ -4,7 +4,7 @@ import os
 import varna
 import inv_utils
 
-def get_colormaps(targets, inputs, input_pos, sequence_length, linker_length, design_linker, n):
+def get_colormaps(targets, inputs, input_pos, sequence_length, n):
     if n == 2:
         colors = [0.5, 0.65]
     elif n == 3:
@@ -21,12 +21,7 @@ def get_colormaps(targets, inputs, input_pos, sequence_length, linker_length, de
         #else:
         #    colormap += "0.0;"*len(inputs[key])
         colormap += "1.0;"*(input_pos[i+1]-input_pos[i])
-        if input_pos[i+1]-input_pos[i] != 0:
-            colormap += "0.0;"*linker_length
         colormap += colors[i]*len(inputs[key])
-        if i != len(inputs)-1:
-            colormap += "0.0;"*linker_length
-    colormap += "0.0;"*len(design_linker)
     colormap += "1.0;"*(sequence_length-input_pos[-1])
     #colormaps.append(colormap)
     return colormap

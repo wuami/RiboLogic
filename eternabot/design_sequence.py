@@ -45,7 +45,7 @@ def get_objective_dict(o):
     o['constrained'] = ensemble_design.get_sequence_string(constrained)
     return o
     
-def read_puzzle_json(text, mode = "hairpin", scoring = "bpp", oligorc = False, strandbonus = False, print_ = False):
+def read_puzzle_json(text, **kwargs):
     """
     read in puzzle as a json file
     """
@@ -82,10 +82,10 @@ def read_puzzle_json(text, mode = "hairpin", scoring = "bpp", oligorc = False, s
         p['linker'] = "AACAA"
 
     if p['rna_type'] == "multi_input" or p['rna_type'] == "multi_input_oligo":
-        return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, p['inputs'], mode, oligorc=oligorc, strandbonus=strandbonus, print_=print_)
-    return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, p['linker'], scoring, mode=mode, oligorc=oligorc, strandbonus=strandbonus, print_=print_)
+        kwargs['inputs'] = p['inputs']
+    return switch_designer.SwitchDesigner(id, p['rna_type'], beginseq, constraints, secstruct, **kwargs)
 
-def optimize_n(puzzle, niter, ncool, n, **kwargs):#submit, draw, fout, cotrans, print_, greedy):
+def optimize_n(puzzle, niter, ncool, n, **kwargs):
     # run puzzle n times
     solutions = []
     scores = []
@@ -94,7 +94,7 @@ def optimize_n(puzzle, niter, ncool, n, **kwargs):#submit, draw, fout, cotrans, 
     while i < n:
         puzzle.reset_sequence()
         passkwargs = {key:kwargs[key] for key in ['greedy', 'cotrans', 'start_oligo_conc']}
-        puzzle.optimize_sequence(niter, ncool, **passkwargs)#greedy=greedy, cotrans=cotrans, print_=print_)
+        puzzle.optimize_sequence(niter, ncool, **passkwargs)
         if puzzle.check_current_secstructs():
             sol = puzzle.get_solution()
             if sol[0] not in solutions:
@@ -126,11 +126,11 @@ def optimize_n(puzzle, niter, ncool, n, **kwargs):#submit, draw, fout, cotrans, 
         print "%s sequence(s) calculated" % i
     return [solutions, scores]
 
-def get_puzzle(id, mode, scoring, oligorc, strandbonus, print_):
+def get_puzzle(id, **kwargs):#mode, scoring, oligorc, strandbonus, print_):
     puzzlefile = os.path.join(settings.PUZZLE_DIR, "%s.json" % id)
     if os.path.isfile(puzzlefile): 
         with open(puzzlefile, 'r') as f:
-            puzzle = read_puzzle_json(f.read(), mode, scoring, oligorc, strandbonus, print_)
+            puzzle = read_puzzle_json(f.read(), **kwargs)#mode, scoring, oligorc, strandbonus, print_)
     else:
         puzzle = get_puzzle_from_server(id, mode, scoring)
     return puzzle
@@ -139,7 +139,6 @@ def get_puzzle_from_server(id, mode, scoring):
     """
     get puzzle with id number id from eterna server
     """
-    #r = requests.get('http://nando.eternadev.org/get/?type=puzzle&nid=%s' % id)
     r = requests.get('http://eternagame.org/get/?type=puzzle&nid=%s' % id)
     return read_puzzle_json(r.text, mode, scoring)
 
@@ -209,18 +208,12 @@ def main():
     args = p.parse_args()
 
     # read puzzle
-    puzzle = get_puzzle(args.puzzleid, args.mode, args.score, args.oligorc, args.strandbonus, args.print_)
+    puzzle = get_puzzle(args.puzzleid, mode=args.mode, scoring=args.score, oligorc=args.oligorc, strandbonus=args.strandbonus, print_=args.print_)
     if not args.nowrite:
         fout = os.path.join(settings.PUZZLE_DIR, args.puzzleid + "_" + puzzle.mode + ".out")
     else:
         fout = False
     
-    #seq = "UCUACUAAAGCGCACGACUAAUGCAUAUCCGUAAACAUGAGGAUCACCCAUGUGCACCUGGUCGAGCACCUAAAGUCUGCUGCUACUGGUUUAGUAUCAACAUUCACAAACAGUCAUGAUAU"
-    #puzzle.update_sequence(seq)
-    #puzzle.update_best()
-    #puzzle.draw_solution("solution0")
-    #view_sequence(puzzle, seq)
-
     # find solutions
     [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, submit=args.submit, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
 
