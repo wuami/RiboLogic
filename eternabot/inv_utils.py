@@ -44,12 +44,9 @@ def fold(seq, cotransc=False, constraint=False):
     pair= p.communicate(input=input)[0]
     p.wait()
 
-    # split result by whitespace
-    toks = re.split('\s+| \(?\s?',pair)
-    ret= []
-    ret.append(toks[1])
-    ret.append(toks[2][1:-1])
-    return ret
+    # parse the result
+    toks = re.search('([AUGC]+)\s*([\.\)\(]+)\s+\(\s*([-0-9\.]+)\s*\)', pair)
+    return [toks.group(2), float(toks.group(3))]
 
 def nupack_fold(seq, oligo_conc, bpp = False):
     """

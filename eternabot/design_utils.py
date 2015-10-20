@@ -184,6 +184,7 @@ class Scorer():
             for target in targets:
                 pair_list = []
                 stack = []
+                print target['secstruct']
                 for i in range(len(target['secstruct'])):
                     if target['constrained'][i] == "x":
                         if target['secstruct'][i] == "(":

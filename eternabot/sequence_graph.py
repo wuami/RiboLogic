@@ -26,6 +26,7 @@ class SequenceGraph(object):
         # create dependency graph
         self.index_array = self.get_unconstrained_indices()
         self.dep_graph = self.get_dependency_graph()
+        #print self.dep_graph.nodes(data=True)
 
         # update constrained parts of sequence
         seq_array = ensemble_design.get_sequence_array(self.sequence)
@@ -136,7 +137,10 @@ class SequenceGraph(object):
         graph = nx.Graph()
         graph.add_nodes_from(range(self.N), bases=['A','U','G','C'])
         for target in self.targets:
-            target['full_secstruct'] = self._get_full_secstruct(target['secstruct'], target['inputs'])
+            if "inputs" in target:
+                target['full_secstruct'] = self._get_full_secstruct(target['secstruct'], target['inputs'])
+            else:
+                target['full_secstruct'] = target['secstruct']
             pairmap = eterna_utils.get_pairmap_from_secstruct(target['full_secstruct'])
             for i, j in enumerate(pairmap):
                 if j > i:

@@ -190,7 +190,7 @@ def loop_energy(n1, n2, type, type_2, si1, sj1, sp1, sq1, b1, b2):
 		""" generic interior loop (no else here!)"""
 		if((n1+n2<=MAXLOOP)) :
 			loop_score = internal37[n1 + n2];
-		else :
+		else:
 			loop_score = EPars.get_internal(n1+n2)
       	
       	loop_score += min(MAX_NINIO, (nl-ns) * F_ninio37[2]);

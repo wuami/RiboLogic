@@ -694,12 +694,12 @@ def get_design_from_sequence(sequence,secstruct,nupack=False,constraint = False)
     design['secstruct_elements'] = get_rna_elements_from_secstruct(design['secstruct'])
 
     design['dotplot'] = get_dotplot(design['sequence'], nupack, constraint)
-    fill_energy(design['secstruct_elements'],design['sequence'],design['pairmap'])
-    elements = design['secstruct_elements']
-    total_energy = 0.0
-    for kk in range(0,len(elements)):
-        total_energy += elements[kk].score_
-    design['fe'] = total_energy
+    #fill_energy(design['secstruct_elements'],design['sequence'],design['pairmap'])
+    #elements = design['secstruct_elements']
+    #total_energy = 0.0
+    #for kk in range(0,len(elements)):
+    #    total_energy += elements[kk].score_
+    #design['fe'] = total_energy
     design['meltpoint'] = 97
     return design
 

@@ -1,27 +1,18 @@
-import ensemble_design
-import ensemble_utils
-import eterna_utils, inv_utils
-import design_utils
+import ensemble_design, ensemble_utils, eterna_utils, inv_utils, design_utils
 import switch_designer
-import sys
-import os
+import sys, os
 import json
 import argparse
 import requests
 import settings
 import varna
 import copy
+import signal
 
 def get_objective_dict(o):
     n = len(o['secstruct'])
     constrained = ensemble_design.get_sequence_array('o'*n)
     struct = ensemble_design.get_sequence_array(o['secstruct'])
-    if 'structure_constrained_bases' in o.keys() and len(o['structure_constrained_bases']) > 0:
-        for i in range(0, len(o['structure_constrained_bases']), 2):
-            [lo, hi] = o['structure_constrained_bases'][i:i+2]
-            for j in range(lo, hi+1):
-                constrained[j] = 'x'
-        del o['structure_constrained_bases']
     if 'anti_structure_constrained_bases' in o.keys() and len(o['anti_structure_constrained_bases']) > 0:
         for i in range(0, len(o['anti_structure_constrained_bases']), 2):
             [lo, hi] = o['anti_structure_constrained_bases'][i:i+2]
@@ -29,6 +20,13 @@ def get_objective_dict(o):
                 constrained[j] = 'x'
                 struct[j] = '.'
         del o['anti_secstruct'], o['anti_structure_constrained_bases']
+    if 'structure_constrained_bases' in o.keys() and len(o['structure_constrained_bases']) > 0:
+        for i in range(0, len(o['structure_constrained_bases']), 2):
+            [lo, hi] = o['structure_constrained_bases'][i:i+2]
+            for j in range(lo, hi+1):
+                constrained[j] = 'x'
+                struct[j] = o['secstruct'][j]
+        del o['structure_constrained_bases']
     if 'structure_unpaired_constrained_bases' in o.keys() and len(o['structure_unpaired_constrained_bases']) > 0:
         for i in range(0, len(o['structure_unpaired_constrained_bases']), 2):
             [lo, hi] = o['structure_unpaired_constrained_bases'][i:i+2]
@@ -126,6 +124,37 @@ def optimize_n(puzzle, niter, ncool, n, **kwargs):
         print "%s sequence(s) calculated" % i
     return [solutions, scores]
 
+def optimize_timed(puzzle, niter, ncool, time, **kwargs):
+    def handler(signum, frame):
+        raise Exception("%d elapsed" % time)
+
+    # run puzzle n times
+    solutions = []
+    scores = []
+    i = 0 
+    signal.signal(signal.SIGALRM, handler)
+    signal.alarm(time)
+    try:
+        while True:
+            puzzle.reset_sequence()
+            passkwargs = {key:kwargs[key] for key in ['greedy', 'cotrans', 'start_oligo_conc']}
+            puzzle.optimize_sequence(niter, ncool, **passkwargs)
+            if puzzle.check_current_secstructs():
+                sol = puzzle.get_solution()
+                solutions.append(sol[0])
+                scores.append(sol[2])
+                i += 1
+            else:
+                print "best distance: %s" % puzzle.best_bp_distance
+                print "final conc: %s" % puzzle.oligo_conc
+            print "%s sequence(s) calculated" % i
+    except Exception, exc:
+        print exc
+        print "%s sequence(s) calculated in %d seconds" % (i, time)
+        for seq, score in zip(solutions, scores):
+            print "\t%s %d" % (seq, score)
+    return [solutions, scores]
+
 def get_puzzle(id, **kwargs):#mode, scoring, oligorc, strandbonus, print_):
     puzzlefile = os.path.join(settings.PUZZLE_DIR, "%s.json" % id)
     if os.path.isfile(puzzlefile): 
@@ -192,9 +221,10 @@ def main():
     p = argparse.ArgumentParser()
     p.add_argument('puzzleid', help="name of puzzle filename or eterna id number", type=str)
     p.add_argument('-n', '--nsol', help="number of solutions", type=int, default=1)
+    p.add_argument('-t', '--time', help="maximum time allowed", type=int)
     p.add_argument('-i', '--niter', help="number of iterations", type=int, default=2000)
     p.add_argument('-o', '--ncool', help="number of times to cool", type=int, default=50)
-    p.add_argument('-m', '--mode', help="mode for multi inputs", type=str, default="hairpin")
+    p.add_argument('-m', '--mode', help="mode for multi inputs", type=str, default="vienna")
     p.add_argument('-s', '--score', help="scoring function", type=str, default="bpp")
     p.add_argument('-c', '--conc', help="starting oligo concentration", type=float, default=1e-7)
     p.add_argument('--submit', help="submit the solution(s)", default=False, action='store_true')
@@ -215,7 +245,10 @@ def main():
         fout = False
     
     # find solutions
-    [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, submit=args.submit, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
+    if args.time:
+        [solutions, scores] = optimize_timed(puzzle, args.niter, args.ncool, args.time, submit=args.submit, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
+    else:
+        [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, submit=args.submit, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
 
 if __name__ == "__main__":
     #unittest.main()

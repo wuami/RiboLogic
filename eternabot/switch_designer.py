@@ -9,6 +9,7 @@ import itertools
 import ensemble_design
 import unittest
 import sys
+from math import log
 import multiprocessing
 import sequence_graph
 
@@ -27,7 +28,8 @@ class SwitchDesigner(object):
         oligorc = kwargs.get("oligorc", False)
         self.strandbonus = kwargs.get("strandbonus", False)
         self.print_ = kwargs.get("print_", False)
-        self.inputs = kwargs.get("inputs", None)
+        self.inputs = kwargs.get("inputs", {})
+        self.aptamer = False
 
         self.targets = self.parse_targets(targets)
         self.sequence_graph = sequence_graph.SequenceGraph(self.inputs, targets, constraints, beginseq, oligorc, False, autocomplement=False)
@@ -98,6 +100,15 @@ class SwitchDesigner(object):
                     constrained += 'o'*(len(self.inputs[input])+1)
                 target['secstruct'] = secstruct + target['secstruct']
                 target['constrained'] = constrained + target['constrained']
+            elif target['type'] == 'aptamer':
+                self.aptamer = float(target['concentration'])
+                fold_constraint = list(target['secstruct'])
+                for i, fold in enumerate(fold_constraint):
+                    if i in target['site'] and fold == ".":
+                        fold_constraint[i] = "x"
+                    elif i not in target['site']:
+                        fold_constraint[i] = "."
+                target['fold_constraint'] = "".join(fold_constraint)
         return targets
 
     def get_fold_sequence(self, sequence, objective):
@@ -105,7 +116,7 @@ class SwitchDesigner(object):
         if objective['type'] == 'oligo':
             return '&'.join([sequence, objective['oligo_sequence']])
         elif objective['type'] == 'oligos':
-            if self.mode == "nupack":
+            if self.mode == "nupack" or self.mode == "vienna":
                 return '&'.join([self.inputs[x] for x in objective['inputs']] + [sequence])
             # get positions of inputs
             fold_seq = ""
@@ -135,8 +146,11 @@ class SwitchDesigner(object):
             print fold_sequence
             if self.mode == "ghost":
                 print inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
-            elif self.mode == "hairpin":
-                print inv_utils.fold(fold_sequence, self.cotrans)[0]
+            elif self.mode == "hairpin" or self.mode == "vienna":
+                if self.targets[i]['type'] == "aptamer":
+                    print inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
+                else:
+                    print inv_utils.fold(fold_sequence, self.cotrans)[0]
             else:
                 print inv_utils.nupack_fold(fold_sequence, self.target_oligo_conc)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
@@ -212,6 +226,7 @@ class SwitchDesigner(object):
         for a particular sequence
         """
         native = [""] * self.n_targets
+        energies = [0] * self.n_targets
         fold_sequences = []
         if self.mode == "nupack":
             p = multiprocessing.Pool(self.n_targets)
@@ -220,18 +235,24 @@ class SwitchDesigner(object):
             fold_sequences.append(fold_sequence)
             if self.mode == "ghost":
                 fold = inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
-                native.append(fold)
-            elif self.mode == "hairpin":
-                fold = inv_utils.fold(fold_sequence, self.cotrans)[0]
-                native.append(fold)
-            else:
+            elif self.mode == "hairpin" or self.mode == "vienna":
+                if self.targets[i]['type'] == "aptamer":
+                    fold_list = inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])
+                else:
+                    fold_list = inv_utils.fold(fold_sequence, self.cotrans)
+                fold = fold_list[0]
+                energy = fold_list[1]
+            native[i] = fold
+            if self.aptamer:
+                energies[i] = energy
+            if self.mode == "nupack":
                 native[i] = p.apply_async(inv_utils.nupack_fold, args=(fold_sequence, self.oligo_conc))
         if self.mode == "nupack":
             p.close()
             p.join()
             native = [x.get() for x in native]
             native = [[x[0], x[2]] for x in native]
-        bp_distance = self.score_secstructs(native)
+        bp_distance = self.score_secstructs(native, energies, sequence)
         return [sequence, native, bp_distance, fold_sequences]
 
     def reset_sequence(self):
@@ -264,13 +285,14 @@ class SwitchDesigner(object):
         self.best_bp_distance = self.bp_distance
         self.best_design_score = self.design_score
 
-    def score_secstructs(self, secstruct):
+    def score_secstructs(self, secstruct, energies = False, sequence = False):
         """
         calculates sum of bp distances for with and without oligo
 
         returns:
         sum of bp distances with and without the oligo 
         """
+        # test for secondary structure matches
         distance = 0.0
         strands_interacting = 0.0
         n_strands = 0.0
@@ -288,12 +310,26 @@ class SwitchDesigner(object):
                             strands_interacting += 1
             if self.print_:
                 print distance,
+
+        # add bonus for interaction of strands
         if self.strandbonus:
             if strands_interacting == 0:
                 strands_interacting += 1
             distance /= strands_interacting/n_strands
             if self.print_:
                 print "bonus: %d" % distance
+        
+        # test energies
+        if energies:
+            if energies[1] - 0.6 * log(self.aptamer/3.0) > energies[0]:
+                distance += 4
+
+        # test sequence
+        if sequence:
+            distance += 4 * sequence.count("GGGG")
+            distance += 4 * sequence.count("CCCC")
+            distance += 5 * sequence.count("AAAAA")
+
         return distance
 
     def check_secstructs(self, secstruct):
@@ -310,7 +346,7 @@ class SwitchDesigner(object):
         return self.score_secstructs(self.best_native) == 0 and self.oligo_conc == self.target_oligo_conc
 
 
-    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, print_ = None, start_oligo_conc=1):
+    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, print_ = None, start_oligo_conc=1, continue_opt=False):
         """
         monte-carlo optimization of the sequence
 
@@ -379,6 +415,9 @@ class SwitchDesigner(object):
                 if(bp_distance < self.best_bp_distance or
                    (bp_distance == self.best_bp_distance and score > self.best_design_score)):
                     self.update_best()
+
+            if self.best_bp_distance == 0 and not continue_opt:
+                break
 
             # decrease temperature
             #if i % (n_iterations/n_cool) == 0:
