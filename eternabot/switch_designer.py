@@ -32,7 +32,7 @@ class SwitchDesigner(object):
         self.aptamer = False
 
         self.targets = self.parse_targets(targets)
-        self.sequence_graph = sequence_graph.SequenceGraph(self.inputs, targets, constraints, beginseq, oligorc, False, autocomplement=False)
+        self.sequence_graph = sequence_graph.SequenceGraph(self.inputs, targets, constraints, beginseq, oligorc, False, autocomplement=True)
         self.target_oligo_conc = 1e-7
 
         # scoring
@@ -76,12 +76,15 @@ class SwitchDesigner(object):
         self.cotrans = False
         
         # print puzzle info
+        print self.constraints
         for i in targets:
             print self.get_fold_sequence(self.sequence, i)
             print i['secstruct']
             print i['constrained']
+            if 'fold_constraint' in i:
+                print i['fold_constraint']
 
-        self.update_folds(*self.get_sequence_info(self.sequence))
+        self.update_current(*self.get_sequence_info(self.sequence))
         
         # maintain sequences
         self.update_best()
@@ -183,13 +186,15 @@ class SwitchDesigner(object):
         solution = self.all_solutions[r]
         return [solution[0], 0, solution[1]]
 
-    def get_design_score(self, sequence, secstruct):
+    def get_design_score(self, sequence, secstruct, energies=False):
         """
         calculates design score using scoring function
         """
         # in a small number of cases, get_design function causes error
         # if this happens, assume 0 score
         #try:
+        if energies:
+            return energies[0] - energies[1]
         if not self.scoring_func:
             return 0
         designs = []
@@ -234,15 +239,15 @@ class SwitchDesigner(object):
             fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
             fold_sequences.append(fold_sequence)
             if self.mode == "ghost":
-                fold = inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
+                native[i] = inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
             elif self.mode == "hairpin" or self.mode == "vienna":
                 if self.targets[i]['type'] == "aptamer":
-                    fold_list = inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])
+                    fold_list = inv_utils.fold(fold_sequences[i], self.cotrans, self.targets[i]['fold_constraint'])
                 else:
-                    fold_list = inv_utils.fold(fold_sequence, self.cotrans)
+                    fold_list = inv_utils.fold(fold_sequences[i], self.cotrans)
                 fold = fold_list[0]
                 energy = fold_list[1]
-            native[i] = fold
+                native[i] = fold
             if self.aptamer:
                 energies[i] = energy
             if self.mode == "nupack":
@@ -252,25 +257,32 @@ class SwitchDesigner(object):
             p.join()
             native = [x.get() for x in native]
             native = [[x[0], x[2]] for x in native]
-        bp_distance = self.score_secstructs(native, energies, sequence)
-        return [sequence, native, bp_distance, fold_sequences]
+        if self.aptamer:
+            design_score = self.get_design_score(fold_sequences, native, energies)
+            bp_distance = self.score_secstructs(native, energies, sequence)
+        else:
+            design_score = max(self.get_design_score(fold_sequences, native),0)
+            bp_distance = self.score_secstructs(native, sequence=sequence)
+        return [sequence, native, bp_distance, fold_sequences, design_score]
 
     def reset_sequence(self):
         """
         reset sequence to the start sequence (for rerunning optimization)
         """
         self.sequence_graph.reset_sequence(self.beginseq)
-        self.update_folds(self.sequence)
+        self.update_current(self.beginseq)
         self.update_best()
         self.all_solutions = []
+        if self.print_:
+            print "reset %s" % self.sequence
 
-    def update_folds(self, sequence, native=None, bp_distance=None, score=None):
+    def update_current(self, sequence, native=None, bp_distance=None, score=None, energies=None):
         """
         updates current sequence and related information
         """
         self.sequence = sequence
         if not native:
-            [sequence, native, bp_distance, fold_sequences] = self.get_sequence_info(sequence)
+            [sequence, native, bp_distance, fold_sequences, design_score] = self.get_sequence_info(sequence)
             score = self.get_design_score(fold_sequences, native)
         self.native = native
         self.bp_distance = bp_distance
@@ -308,8 +320,6 @@ class SwitchDesigner(object):
                         n_strands += 1
                         if "(" in strands[strand-1] or ")" in strands[strand-1]:
                             strands_interacting += 1
-            if self.print_:
-                print distance,
 
         # add bonus for interaction of strands
         if self.strandbonus:
@@ -318,7 +328,7 @@ class SwitchDesigner(object):
             distance /= strands_interacting/n_strands
             if self.print_:
                 print "bonus: %d" % distance
-        
+
         # test energies
         if energies:
             if energies[1] - 0.6 * log(self.aptamer/3.0) > energies[0]:
@@ -391,7 +401,7 @@ class SwitchDesigner(object):
             
             # pick random nucleotide in sequence
             mut_sequence = self.sequence_graph.mutate()
-            [mut_sequence, native, bp_distance, fold_sequences] = self.get_sequence_info(mut_sequence)
+            [mut_sequence, native, bp_distance, fold_sequences, design_score] = self.get_sequence_info(mut_sequence)
 
             if self.best_bp_distance != 0 and bp_distance == 0:
                 print i
@@ -399,10 +409,9 @@ class SwitchDesigner(object):
             # if distance or score is better for mutant, update the current sequence
             p = p_func(self.bp_distance, bp_distance)
             if(random.random() <= p):
-                score = max(self.get_design_score(fold_sequences, native),0)
-                if self.bp_distance == bp_distance and p_func(self.design_score, score):
+                if self.bp_distance == bp_distance and p_func(self.design_score, design_score):
                     continue
-                self.update_folds(mut_sequence, native, bp_distance, score)
+                self.update_current(mut_sequence, native, bp_distance, design_score)
                 if self.print_:
                     print self.sequence, self.bp_distance, self.design_score
                     print "conc: %s" % self.oligo_conc
@@ -413,11 +422,11 @@ class SwitchDesigner(object):
             
                 # if distance or score is better for mutant than best, update the best sequence    
                 if(bp_distance < self.best_bp_distance or
-                   (bp_distance == self.best_bp_distance and score > self.best_design_score)):
+                   (bp_distance == self.best_bp_distance and design_score > self.best_design_score)):
                     self.update_best()
 
-            if self.best_bp_distance == 0 and not continue_opt:
-                break
+            if self.best_bp_distance == 0 and self.oligo_conc == self.target_oligo_conc and not continue_opt:
+                return i
 
             # decrease temperature
             #if i % (n_iterations/n_cool) == 0:
@@ -435,7 +444,7 @@ class SwitchDesigner(object):
                         self.oligo_conc = self.target_oligo_conc
                     else:
                         self.oligo_conc /= 10
-                self.update_folds(self.sequence)
+                self.update_current(self.sequence)
                 self.update_best()
                 print self.native, self.bp_distance
                 print self.best_native, self.best_bp_distance
@@ -450,12 +459,12 @@ class test_functions(unittest.TestCase):
 
     def test_check_secstructs(self):
         sequence = "ACAAGCUUUUUGCUCGUCUUAUACAUGGGUAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA"
-        self.puzzle.update_folds(*self.puzzle.get_sequence_info(sequence))
+        self.puzzle.update_current(*self.puzzle.get_sequence_info(sequence))
         self.assertTrue(self.puzzle.check_current_secstructs())
 
     def test_optimize_sequence(self):
         sequence = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA"
-        self.puzzle.update_folds(*self.puzzle.get_sequence_info(sequence))
+        self.puzzle.update_current(*self.puzzle.get_sequence_info(sequence))
         self.puzzle.optimize_sequence(1000)
         print self.puzzle.get_solution()
 

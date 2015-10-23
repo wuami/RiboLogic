@@ -131,6 +131,7 @@ def optimize_timed(puzzle, niter, ncool, time, **kwargs):
     # run puzzle n times
     solutions = []
     scores = []
+    niters = []
     i = 0 
     signal.signal(signal.SIGALRM, handler)
     signal.alarm(time)
@@ -138,11 +139,12 @@ def optimize_timed(puzzle, niter, ncool, time, **kwargs):
         while True:
             puzzle.reset_sequence()
             passkwargs = {key:kwargs[key] for key in ['greedy', 'cotrans', 'start_oligo_conc']}
-            puzzle.optimize_sequence(niter, ncool, **passkwargs)
+            n = puzzle.optimize_sequence(niter, ncool, **passkwargs)
             if puzzle.check_current_secstructs():
                 sol = puzzle.get_solution()
                 solutions.append(sol[0])
                 scores.append(sol[2])
+                niters.append(n)
                 i += 1
             else:
                 print "best distance: %s" % puzzle.best_bp_distance
@@ -151,8 +153,9 @@ def optimize_timed(puzzle, niter, ncool, time, **kwargs):
     except Exception, exc:
         print exc
         print "%s sequence(s) calculated in %d seconds" % (i, time)
-        for seq, score in zip(solutions, scores):
-            print "\t%s %d" % (seq, score)
+        print "average iterations: %d" % (float(sum(niters))/len(niters))
+        for i in range(len(solutions)):
+            print "\t%s %d %d" % (solutions[i], scores[i], niters[i])
     return [solutions, scores]
 
 def get_puzzle(id, **kwargs):#mode, scoring, oligorc, strandbonus, print_):
@@ -161,7 +164,7 @@ def get_puzzle(id, **kwargs):#mode, scoring, oligorc, strandbonus, print_):
         with open(puzzlefile, 'r') as f:
             puzzle = read_puzzle_json(f.read(), **kwargs)#mode, scoring, oligorc, strandbonus, print_)
     else:
-        puzzle = get_puzzle_from_server(id, mode, scoring)
+        puzzle = get_puzzle_from_server(id, kwargs['mode'], kwargs['scoring'])
     return puzzle
 
 def get_puzzle_from_server(id, mode, scoring):
@@ -236,6 +239,8 @@ def main():
     p.add_argument('--oligorc', help="introduce reverse complement of input oligos", default=False, action='store_true')
     p.add_argument('--strandbonus', help="bonus for interaction of oligo strands", default=False, action='store_true')
     args = p.parse_args()
+
+    print args.puzzleid
 
     # read puzzle
     puzzle = get_puzzle(args.puzzleid, mode=args.mode, scoring=args.score, oligorc=args.oligorc, strandbonus=args.strandbonus, print_=args.print_)

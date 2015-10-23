@@ -29,12 +29,9 @@ class SequenceGraph(object):
         #print self.dep_graph.nodes(data=True)
 
         # update constrained parts of sequence
-        seq_array = ensemble_design.get_sequence_array(self.sequence)
-        if self.autocomplement:
-            for i in range(self.N):
-                if self.seq_locks[i] == "x":
-                    self.update_neighbors(i, seq_array, [])
-        self.sequence = ensemble_design.get_sequence_string(seq_array)
+        self.oligorc = oligorc
+        self.reset_sequence(self.sequence)
+        print self.sequence
 
         # draw if option specified
         self.draw = draw
@@ -45,10 +42,8 @@ class SequenceGraph(object):
             plt.savefig("dependency_graph%s.png" % self.printi, dpi=300)
             self.printi += 1
         
-        # set reverse complements to inputs
-        self.oligorc = oligorc
+        # set mutation function
         if oligorc:
-            self.set_oligo_rcs()
             self.mutate_func = self.mutate_and_shift
         else:
             self.mutate_func = self.mutate_sequence

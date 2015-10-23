@@ -50,11 +50,10 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
                 umatch += 1
         elif locks[i] == "x":
             if(pairmap1[i] != pairmap2[i]):
-                dist += 1
-                #if(pairmap1[i] > i):
-                #    dist += 1
-                #if(pairmap2[i] > i):
-                #    dist += 1
+                if(pairmap1[i] > i):
+                    dist += 1
+                if(pairmap2[i] > i):
+                    dist += 1
         else:
             continue
         if i == threshold[j][1]:
@@ -109,7 +108,7 @@ def get_rcs(base):
     else:
         raise ValueError("invalid base: %s" % base)
 
-def rc_single(base, pGU=0.2, possible_bases="AUGC"):
+def rc_single(base, pGU=0, possible_bases="AUGC"):
     complements = get_rcs(base) 
     if not any([b in possible_bases for b in complements]):
         raise ValueError("no complements to %s in %s" % (base, str(possible_bases)))
@@ -121,7 +120,7 @@ def rc_single(base, pGU=0.2, possible_bases="AUGC"):
     else:
         return complements[0] 
 
-def rc(bases, pGU=0.2, possible_bases="AUGC"):
+def rc(bases, pGU=0, possible_bases="AUGC"):
     rc = ""
     for base in bases:
         rc += rc_single(base, pGU, possible_bases)
