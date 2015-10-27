@@ -7,7 +7,8 @@
 
 source ~/.bashrc
 
-puzzle="and_gate_tb"
-niter=10000
-echo $puzzle", $niter iter"
-python2.7 /home/mjwu/EteRNABot/eternabot/design_sequence.py -m nupack --prints -i $niter $puzzle
+niter=100000
+conc="1"
+echo ${puzzle}", $niter iter, start conc $conc, BPP SCORING"
+echo ${options}
+python2.7 /home/mjwu/EteRNABot/eternabot/design_sequence.py -m nupack --print_ -i $niter -c $conc ${options} ${puzzle}
