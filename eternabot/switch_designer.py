@@ -1,17 +1,12 @@
-import eterna_utils
-import design_utils
+import eterna_utils, design_utils, ensemble_design, sequence_graph
 import varna, draw_utils
 import settings
 import inv_utils
-import random
-import math
-import itertools
+import math, random
 import ensemble_design
 import unittest
 import sys
-from math import log
 import multiprocessing
-import sequence_graph
 
 class SwitchDesigner(object):
 
@@ -25,14 +20,14 @@ class SwitchDesigner(object):
         self.constraints = constraints
 
         self.mode = kwargs.get("mode", "nupack")
-        oligorc = kwargs.get("oligorc", False)
+        add_rcs = kwargs.get("add_rcs", False)
         self.strandbonus = kwargs.get("strandbonus", False)
         self.print_ = kwargs.get("print_", False)
         self.inputs = kwargs.get("inputs", {})
         self.aptamer = False
 
         self.targets = self.parse_targets(targets)
-        self.sequence_graph = sequence_graph.SequenceGraph(self.inputs, targets, constraints, beginseq, oligorc, False, autocomplement=True)
+        self.sequence_graph = sequence_graph.SequenceGraph(self.inputs, targets, constraints, beginseq, add_rcs, False, autocomplement=True)
         self.target_oligo_conc = 1e-7
 
         # scoring
@@ -331,14 +326,14 @@ class SwitchDesigner(object):
 
         # test energies
         if energies:
-            if energies[1] - 0.6 * log(self.aptamer/3.0) > energies[0]:
+            if energies[1] - 0.6 * math.log(self.aptamer/3.0) > energies[0]:
                 distance += 4
 
         # test sequence
         if sequence:
-            distance += 4 * sequence.count("GGGG")
-            distance += 4 * sequence.count("CCCC")
-            distance += 5 * sequence.count("AAAAA")
+            distance += 1 * sequence.count("GGGG")
+            distance += 1 * sequence.count("CCCC")
+            distance += 1 * sequence.count("AAAAA")
 
         return distance
 
@@ -354,7 +349,6 @@ class SwitchDesigner(object):
 
     def check_current_secstructs(self):
         return self.score_secstructs(self.best_native) == 0 and self.oligo_conc == self.target_oligo_conc
-
 
     def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, print_ = None, start_oligo_conc=1, continue_opt=False):
         """

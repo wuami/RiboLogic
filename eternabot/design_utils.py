@@ -124,7 +124,7 @@ def rc(bases, pGU=0, possible_bases="AUGC"):
     rc = ""
     for base in bases:
         rc += rc_single(base, pGU, possible_bases)
-    return rc
+    return rc[::-1]
 
 def get_different_base(base):
     bases ="GCAU"

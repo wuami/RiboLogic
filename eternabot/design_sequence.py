@@ -158,11 +158,11 @@ def optimize_timed(puzzle, niter, ncool, time, **kwargs):
             print "\t%s %d %d" % (solutions[i], scores[i], niters[i])
     return [solutions, scores]
 
-def get_puzzle(id, **kwargs):#mode, scoring, oligorc, strandbonus, print_):
+def get_puzzle(id, **kwargs):#mode, scoring, add_rcs, strandbonus, print_):
     puzzlefile = os.path.join(settings.PUZZLE_DIR, "%s.json" % id)
     if os.path.isfile(puzzlefile): 
         with open(puzzlefile, 'r') as f:
-            puzzle = read_puzzle_json(f.read(), **kwargs)#mode, scoring, oligorc, strandbonus, print_)
+            puzzle = read_puzzle_json(f.read(), **kwargs)#mode, scoring, add_rcs, strandbonus, print_)
     else:
         puzzle = get_puzzle_from_server(id, kwargs['mode'], kwargs['scoring'])
     return puzzle
@@ -236,14 +236,14 @@ def main():
     p.add_argument('--cotrans', help="enable cotranscriptional folding", default=False, action='store_true')
     p.add_argument('--print_', help="print sequences throughout optimization", default=False, action='store_true')
     p.add_argument('--greedy', help="greedy search", default=False, action='store_true')
-    p.add_argument('--oligorc', help="introduce reverse complement of input oligos", default=False, action='store_true')
+    p.add_argument('--add_rcs', help="introduce reverse complement of input oligos", default=False, action='store_true')
     p.add_argument('--strandbonus', help="bonus for interaction of oligo strands", default=False, action='store_true')
     args = p.parse_args()
 
     print args.puzzleid
 
     # read puzzle
-    puzzle = get_puzzle(args.puzzleid, mode=args.mode, scoring=args.score, oligorc=args.oligorc, strandbonus=args.strandbonus, print_=args.print_)
+    puzzle = get_puzzle(args.puzzleid, mode=args.mode, scoring=args.score, add_rcs=args.add_rcs, strandbonus=args.strandbonus, print_=args.print_)
     if not args.nowrite:
         fout = os.path.join(settings.PUZZLE_DIR, args.puzzleid + "_" + puzzle.mode + ".out")
     else:
