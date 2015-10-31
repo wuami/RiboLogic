@@ -19,6 +19,7 @@ class SequenceGraph(object):
         self.inputs = inputs
         self.targets = targets
         self.seq_locks = self._get_full_seqlocks(seq_locks)
+        self.design_seq = sequence
         self.sequence = self._get_full_sequence(sequence)
         self.n = len(sequence)
         self.N = len(self.sequence)
@@ -31,8 +32,7 @@ class SequenceGraph(object):
 
         # update constrained parts of sequence
         self.add_rcs = add_rcs
-        self.reset_sequence(self.sequence)
-        print self.sequence
+        self.reset_sequence(self.design_seq)
 
         # draw if option specified
         self.draw = draw
@@ -77,7 +77,8 @@ class SequenceGraph(object):
         oligo2_start = [x + self.seq_offset for x in [self.n-len(inputs[1]), self.n]]
         self.set_oligo_rc(inputs[1], oligo2_start)
         self.pmut = 0.2
-        self.pexpand = 0.5
+        self.pexpand = 0.8
+        self.pshift = 0.5
 
     def set_oligo_rc(self, seq, range):
         """
@@ -198,35 +199,42 @@ class SequenceGraph(object):
         return self.sequence[-self.n:]
 
     def get_rand_shift(self):
-        # randomly choose an oligo
+        # randomly choose an oligo and whether to shift
         roligo = random.getrandbits(1)
+        shift = random.random() < self.pshift
+        min_index = min(list(itertools.chain(*self.index_array)))
+        max_index = max(list(itertools.chain(*self.index_array)))
 
         # choose to expand or shrink rc sequence
         maxed_out = False
-        min_index = min(list(itertools.chain(*self.index_array)))
-        max_index = max(list(itertools.chain(*self.index_array)))
-        if self.oligo_len[roligo][1]-self.oligo_len[roligo][0] <= 0:
-            expand = 1
-        if self.oligo_len[roligo][1]-self.oligo_len[roligo][0] == len(self.oligo_rc)-1:
+        if shift:
             expand = 0
-        if 'expand' not in locals():
-            expand = random.random() < self.pexpand
+        else:
+            if self.oligo_len[roligo][1]-self.oligo_len[roligo][0] <= 0:
+                expand = 1
+            if self.oligo_len[roligo][1]-self.oligo_len[roligo][0] == len(self.oligo_rc)-1:
+                expand = 0
+            if 'expand' not in locals():
+                expand = random.random() < self.pexpand
+
 
         # choose left or right
-        if expand:
+        if expand or shift:
             if self.oligo_pos[roligo][1] >= self.N or self.oligo_pos[roligo][1] >= max_index or \
-               self.oligo_len[roligo][1] >= len(self.oligo_rc[roligo])-1 or self.seq_locks[self.oligo_pos[roligo][1]-1] == 'x':
+               (self.oligo_len[roligo][1] >= len(self.oligo_rc[roligo])-1 and expand) or \
+               self.seq_locks[self.oligo_pos[roligo][1]-1] == 'x':
                 right = 0
                 maxed_out = True
             if self.oligo_pos[roligo][0] <= 0 or self.oligo_pos[roligo][0] <= min_index or \
-                 self.oligo_len[roligo][0] <= 0 or self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
+               (self.oligo_len[roligo][0] <= len(self.oligo_rc[roligo])/2 and expand) or \
+               self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
                 right = 1
                 if maxed_out:
                     expand = 0
         if 'right' not in locals():
             right = random.getrandbits(1)
         
-        return roligo, expand, right
+        return roligo, shift, expand, right
 
     def mutate_or_shift(self):
         """
@@ -235,33 +243,47 @@ class SequenceGraph(object):
         # mutate randomly wp 0.5, otherwise mutate oligo rc
         if (random.random() < self.pmut): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
             return self.mutate_sequence()
-            
+
         mut_array = ensemble_design.get_sequence_array(self.sequence)
-        roligo, expand, right = self.get_rand_shift()
-        # wp 0.5 expand
+        roligo, shift, expand, right = self.get_rand_shift()
+        # shift complement sequence
+        if shift:
+            if right:
+                mut_array[self.oligo_pos[roligo][0]] = ensemble_design.get_random_base(self.dep_graph.node[self.oligo_pos[roligo][0]]['bases'])
+                self.oligo_pos[roligo] = [x+1 for x in self.oligo_pos[roligo]] 
+            else:
+                self.oligo_pos[roligo] = [x-1 for x in self.oligo_pos[roligo]] 
+                mut_array[self.oligo_pos[roligo][1]] = ensemble_design.get_random_base(self.dep_graph.node[self.oligo_pos[roligo][1]]['bases'])
+            seq = ensemble_design.get_sequence_string(mut_array)
+            start, end = self.oligo_pos[roligo]
+            lo, hi = self.oligo_len[roligo]
+            new_seq = seq[:start] + self.oligo_rc[roligo][lo:hi+1] + seq[end:]
+            assert len(seq) == len(new_seq), "shifted sequence changed lengths"
+            return new_seq
+        # expand complement sequence
         if expand:
             if right:
                 mut_array[self.oligo_pos[roligo][right]] = self.oligo_rc[roligo][self.oligo_len[roligo][right]]
-                self.oligo_pos[roligo][right] += 1
-                self.oligo_len[roligo][right] += 1
+                self.oligo_pos[roligo][1] += 1
+                self.oligo_len[roligo][1] += 1
             else:
-                self.oligo_pos[roligo][right] -= 1
-                self.oligo_len[roligo][right] -= 1
+                self.oligo_pos[roligo][0] -= 1
+                self.oligo_len[roligo][0] -= 1
                 mut_array[self.oligo_pos[roligo][right]] = self.oligo_rc[roligo][self.oligo_len[roligo][right]]
-        # otherwise shrink
+        # shrink complement sequence
         else:
             if right:
-                self.oligo_pos[roligo][right] -= 1
-                self.oligo_len[roligo][right] -= 1
+                self.oligo_pos[roligo][1] -= 1
+                self.oligo_len[roligo][1] -= 1
                 mutate_pos = self.oligo_pos[roligo][right]
                 mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos]['bases'])
             else:
                 mutate_pos = self.oligo_pos[roligo][right]
                 mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos]['bases'])
-                self.oligo_pos[roligo][right] += 1
-                self.oligo_len[roligo][right] += 1 
+                self.oligo_pos[roligo][0] += 1
+                self.oligo_len[roligo][0] += 1 
         self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
-        print self.oligo_pos
+        print self.oligo_pos, self.oligo_len
         return ensemble_design.get_sequence_string(mut_array)
 
     def mutate_sequence(self):

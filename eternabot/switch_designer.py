@@ -1,9 +1,8 @@
-import eterna_utils, design_utils, ensemble_design, sequence_graph
+import eterna_utils, design_utils, inv_utils
+import ensemble_design, sequence_graph
 import varna, draw_utils
 import settings
-import inv_utils
 import math, random
-import ensemble_design
 import unittest
 import sys
 import multiprocessing
@@ -95,7 +94,7 @@ class SwitchDesigner(object):
             if target['type'] == 'oligos' and len(target['inputs']) > 0 and '&' not in target['secstruct']:
                 for input in target['inputs']:
                     secstruct += '.'*len(self.inputs[input]) + '&'
-                    constrained += 'o'*(len(self.inputs[input])+1)
+                    constrained += 'o'*len(self.inputs[input]) + 'x'
                 target['secstruct'] = secstruct + target['secstruct']
                 target['constrained'] = constrained + target['constrained']
             elif target['type'] == 'aptamer':
@@ -107,6 +106,12 @@ class SwitchDesigner(object):
                     elif i not in target['site']:
                         fold_constraint[i] = "."
                 target['fold_constraint'] = "".join(fold_constraint)
+            if '&' in target['secstruct']:
+                breaks = [i for i, char in enumerate(target['secstruct']) if char == '&']
+                constrained = list(target['constrained'])
+                for i in breaks:
+                    constrained[i] = 'x'
+                target['constrained'] = "".join(constrained)
         return targets
 
     def get_fold_sequence(self, sequence, objective):
@@ -115,7 +120,7 @@ class SwitchDesigner(object):
             return '&'.join([sequence, objective['oligo_sequence']])
         elif objective['type'] == 'oligos':
             if self.mode == "nupack" or self.mode == "vienna":
-                return '&'.join([self.inputs[x] for x in objective['inputs']] + [sequence])
+                return '&'.join([self.inputs[x] for x in sorted(objective['inputs'])] + [sequence])
             # get positions of inputs
             fold_seq = ""
             for i,input in enumerate(sorted(self.inputs)):
@@ -246,7 +251,10 @@ class SwitchDesigner(object):
             if self.aptamer:
                 energies[i] = energy
             if self.mode == "nupack":
-                native[i] = p.apply_async(inv_utils.nupack_fold, args=(fold_sequence, self.oligo_conc))
+                if isinstance(self.targets[i]['inputs'], dict):
+                    native[i] = p.apply_async(inv_utils.nupack_fold, args=(fold_sequence, self.targets[i]['inputs'].values()))
+                else:
+                    native[i] = p.apply_async(inv_utils.nupack_fold, args=(fold_sequence, self.oligo_conc))
         if self.mode == "nupack":
             p.close()
             p.join()
@@ -389,6 +397,8 @@ class SwitchDesigner(object):
         else:
             p_func = p_dist
 
+        niter = None
+
         # loop as long as bp distance too large or design score too small
         for i in range(n_iterations):
             #random.shuffle(index_array)
@@ -398,6 +408,7 @@ class SwitchDesigner(object):
             [mut_sequence, native, bp_distance, fold_sequences, design_score] = self.get_sequence_info(mut_sequence)
 
             if self.best_bp_distance != 0 and bp_distance == 0:
+                niter = i
                 print i
             
             # if distance or score is better for mutant, update the current sequence
@@ -444,7 +455,7 @@ class SwitchDesigner(object):
                 print self.best_native, self.best_bp_distance
             #    self.all_solutions.append([mut_sequence, score])
         
-        return
+        return niter
 
 class test_functions(unittest.TestCase):
 

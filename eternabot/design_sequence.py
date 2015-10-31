@@ -92,7 +92,7 @@ def optimize_n(puzzle, niter, ncool, n, **kwargs):
     while i < n:
         puzzle.reset_sequence()
         passkwargs = {key:kwargs[key] for key in ['greedy', 'cotrans', 'start_oligo_conc']}
-        puzzle.optimize_sequence(niter, ncool, **passkwargs)
+        nfin = puzzle.optimize_sequence(niter, ncool, **passkwargs)
         if puzzle.check_current_secstructs():
             sol = puzzle.get_solution()
             if sol[0] not in solutions:
@@ -110,7 +110,7 @@ def optimize_n(puzzle, niter, ncool, n, **kwargs):
                     if 'cotrans' in kwargs and kwargs['cotrans']:
                         params += "cotranscriptional"
                     with open(kwargs['fout'], 'a') as f:
-                        f.write("# %s iterations, %s coolings, %s\n" % (niter, ncool, params))
+                        f.write("# %s out of %s iterations, %s coolings, %s\n" % (nfin, niter, ncool, params))
                         f.write("%s\t%1.6f\n" % (sol[0], sol[2]))
                 i += 1
                 attempts = 0
@@ -172,7 +172,7 @@ def get_puzzle_from_server(id, mode, scoring):
     get puzzle with id number id from eterna server
     """
     r = requests.get('http://eternagame.org/get/?type=puzzle&nid=%s' % id)
-    return read_puzzle_json(r.text, mode, scoring)
+    return read_puzzle_json(r.text, mode=mode, scoring=scoring)
 
 def post_solutions(puzzleid, filename, mode):
     filename = os.path.join(settings.PUZZLE_DIR, filename)

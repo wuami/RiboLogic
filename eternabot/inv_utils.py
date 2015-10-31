@@ -62,7 +62,10 @@ def nupack_fold(seq, oligo_conc, bpp = False):
         f.write("1\n")
     os.system("cp %s/%s.list %s.list" % (settings.NUPACK_DIR, len(split), rand_string))
     with open("%s.con" % rand_string, "w") as f:
-        f.write("%s\n" % oligo_conc * (len(split)-1))
+        if isinstance(oligo_conc, list):
+            f.write("%s\n" % "\n".join([str(x) for x in oligo_conc]))
+        else:
+            f.write("%s\n" % oligo_conc * (len(split)-1))
         f.write("1e-9\n")
     options = ['-material', DEFAULT_PARAMS, '-ordered', '-mfe']#, '-quiet']
     if bpp:
