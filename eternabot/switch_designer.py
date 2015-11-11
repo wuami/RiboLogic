@@ -1,5 +1,5 @@
-import eterna_utils, design_utils, inv_utils
-import ensemble_design, sequence_graph
+import design_utils, fold_utils
+import sequence_graph
 import varna, draw_utils
 import settings
 import math, random
@@ -30,26 +30,12 @@ class SwitchDesigner(object):
         self.target_oligo_conc = 1e-7
 
         # scoring
-        if "scoring" in kwargs:
-            if kwargs["scoring"] == "bpp":
-                self.scoring_func = design_utils.get_bpp_scoring_func(targets)
-            elif kwargs["scoring"] == "ensemble":
-                self.scoring_func = design_utils.get_ensemble_scoring_func()
-            elif kwargs["scoring"] == "landing":
-                self.scoring_func = design_utils.get_strategy_scoring_func("eli_landing_lane")
-            elif kwargs["scoring"] == "null":
-                self.scoring_func = None
-            else:
-                raise ValueError("invalid scoring function: %s" % kwargs["scoring"])
-        else:
-            self.scoring_func = design_utils.get_bpp_scoring_func(targets)
+        self.scoring_func = design_utils.get_bpp_scoring_func(targets, self.mode == "nupack")
 
         #if type == "multi_input_oligo":
         self.bp_distance_func = design_utils.bp_distance_with_unpaired
         self.greedy = False
-        self.oligo_conc = 1e-7
-        #else:
-        #    self.bp_distance_func = design_utils.bp_distance_with_constraint
+        self.oligo_conc = 1e7
         if self.mode == "hairpin":
             self.hp_mismatch = False
 
@@ -119,24 +105,7 @@ class SwitchDesigner(object):
         if objective['type'] == 'oligo':
             return '&'.join([sequence, objective['oligo_sequence']])
         elif objective['type'] == 'oligos':
-            if self.mode == "nupack" or self.mode == "vienna":
-                return '&'.join([self.inputs[x] for x in sorted(objective['inputs'])] + [sequence])
-            # get positions of inputs
-            fold_seq = ""
-            for i,input in enumerate(sorted(self.inputs)):
-                # add portion of sequence between two inputs
-                fold_seq += sequence[self.input_pos[i]:self.input_pos[i+1]]
-                # add input sequence
-                if input in objective['inputs']:
-                    if self.mode == "ghost":
-                        fold_seq += design_utils.rc(self.inputs[input])
-                    elif i == len(self.inputs)-1:
-                        fold_seq += self.get_hairpin(design_utils.rc(self.inputs[input]), False, self.hp_mismatch)
-                    else:
-                        fold_seq += self.get_hairpin(design_utils.rc(self.inputs[input]), True, self.hp_mismatch)
-                else:
-                    fold_seq += design_utils.rc(self.inputs[input])
-            return fold_seq + sequence[self.input_pos[-1]:]
+            return '&'.join([self.inputs[x] for x in sorted(objective['inputs'])] + [sequence])
         else:
             return sequence 
 
@@ -148,14 +117,14 @@ class SwitchDesigner(object):
             fold_sequence = self.get_fold_sequence(self.best_sequence, self.targets[i])
             print fold_sequence
             if self.mode == "ghost":
-                print inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
+                print fold_utils.vienna_fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
             elif self.mode == "hairpin" or self.mode == "vienna":
                 if self.targets[i]['type'] == "aptamer":
-                    print inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
+                    print fold_utils.vienna_fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
                 else:
-                    print inv_utils.fold(fold_sequence, self.cotrans)[0]
+                    print fold_utils.vienna_fold(fold_sequence, self.cotrans)[0]
             else:
-                print inv_utils.nupack_fold(fold_sequence, self.target_oligo_conc)[0]
+                print fold_utils.nupack_fold(fold_sequence, self.target_oligo_conc*self.oligo_conc)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
 
     def draw_solution(self, name):
@@ -186,7 +155,7 @@ class SwitchDesigner(object):
         solution = self.all_solutions[r]
         return [solution[0], 0, solution[1]]
 
-    def get_design_score(self, sequence, secstruct, energies=False):
+    def get_design_score(self, sequences, energies=False):
         """
         calculates design score using scoring function
         """
@@ -197,33 +166,10 @@ class SwitchDesigner(object):
             return energies[0] - energies[1]
         if not self.scoring_func:
             return 0
-        designs = []
-        for i in range(self.n_targets):
-            if self.mode == "ghost":
-                designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i], self.targets[i]['fold_constraint']))
-            elif self.mode == "nupack":
-                designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i], nupack=self.oligo_conc))
-            else:
-                designs.append(eterna_utils.get_design_from_sequence(sequence[i], secstruct[i]))
-        score = self.scoring_func(designs)
+        score = self.scoring_func(sequences)
         return score
         #except:
         #    return 0
-
-    def get_hairpin(self, seq, begin, mismatch):
-        """ turn sequence into hairpin """
-        n = (len(seq)-4)/2
-        if begin:
-            hairpin = seq[0:n] + seq[n:len(seq)-n] + design_utils.rc(seq[0:n])
-            i = -n/2
-        else:
-            hairpin = design_utils.rc(seq[-n:]) + seq[n:len(seq)-n] + seq[-n:]
-            i = n/2
-        if mismatch:
-            hairpin = ensemble_design.get_sequence_array(hairpin)
-            hairpin[i] = design_utils.get_different_base(hairpin[i])
-            return ensemble_design.get_sequence_string(hairpin)
-        return hairpin
 
     def get_sequence_info(self, sequence):
         """
@@ -239,12 +185,12 @@ class SwitchDesigner(object):
             fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
             fold_sequences.append(fold_sequence)
             if self.mode == "ghost":
-                native[i] = inv_utils.fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
+                native[i] = fold_utils.vienna_fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
             elif self.mode == "hairpin" or self.mode == "vienna":
                 if self.targets[i]['type'] == "aptamer":
-                    fold_list = inv_utils.fold(fold_sequences[i], self.cotrans, self.targets[i]['fold_constraint'])
+                    fold_list = fold_utils.vienna_fold(fold_sequences[i], self.cotrans, self.targets[i]['fold_constraint'])
                 else:
-                    fold_list = inv_utils.fold(fold_sequences[i], self.cotrans)
+                    fold_list = fold_utils.vienna_fold(fold_sequences[i], self.cotrans)
                 fold = fold_list[0]
                 energy = fold_list[1]
                 native[i] = fold
@@ -252,19 +198,19 @@ class SwitchDesigner(object):
                 energies[i] = energy
             if self.mode == "nupack":
                 if isinstance(self.targets[i]['inputs'], dict):
-                    native[i] = p.apply_async(inv_utils.nupack_fold, args=(fold_sequence, self.targets[i]['inputs'].values()))
+                    native[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, [x*self.oligo_conc for x in self.targets[i]['inputs'].values()]))
                 else:
-                    native[i] = p.apply_async(inv_utils.nupack_fold, args=(fold_sequence, self.oligo_conc))
+                    native[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, self.target_oligo_conc*self.oligo_conc))
         if self.mode == "nupack":
             p.close()
             p.join()
             native = [x.get() for x in native]
             native = [[x[0], x[2]] for x in native]
         if self.aptamer:
-            design_score = self.get_design_score(fold_sequences, native, energies)
+            design_score = self.get_design_score(fold_sequences, energies)
             bp_distance = self.score_secstructs(native, energies, sequence)
         else:
-            design_score = max(self.get_design_score(fold_sequences, native),0)
+            design_score = max(self.get_design_score(fold_sequences),0)
             bp_distance = self.score_secstructs(native, sequence=sequence)
         return [sequence, native, bp_distance, fold_sequences, design_score]
 
@@ -286,7 +232,7 @@ class SwitchDesigner(object):
         self.sequence = sequence
         if not native:
             [sequence, native, bp_distance, fold_sequences, design_score] = self.get_sequence_info(sequence)
-            score = self.get_design_score(fold_sequences, native)
+            score = self.get_design_score(fold_sequences)
         self.native = native
         self.bp_distance = bp_distance
         self.design_score = score
@@ -356,9 +302,9 @@ class SwitchDesigner(object):
         return self.score_secstructs(secstruct) == 0
 
     def check_current_secstructs(self):
-        return self.score_secstructs(self.best_native) == 0 and self.oligo_conc == self.target_oligo_conc
+        return self.score_secstructs(self.best_native) == 0 and self.oligo_conc == 1
 
-    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, print_ = None, start_oligo_conc=1, continue_opt=False):
+    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, print_ = None, start_oligo_conc=1e7, continue_opt=False):
         """
         monte-carlo optimization of the sequence
 
@@ -430,7 +376,7 @@ class SwitchDesigner(object):
                    (bp_distance == self.best_bp_distance and design_score > self.best_design_score)):
                     self.update_best()
 
-            if self.best_bp_distance == 0 and self.oligo_conc == self.target_oligo_conc and not continue_opt:
+            if self.best_bp_distance == 0 and self.oligo_conc == 1 and not continue_opt:
                 return i
 
             # decrease temperature
@@ -444,9 +390,9 @@ class SwitchDesigner(object):
             
             # update oligo_conc
             if self.best_bp_distance == 0:
-                if self.oligo_conc > self.target_oligo_conc:
-                    if self.oligo_conc/10 <= self.target_oligo_conc:
-                        self.oligo_conc = self.target_oligo_conc
+                if self.oligo_conc > 1:
+                    if self.oligo_conc/10 <= 1:
+                        self.oligo_conc = 1
                     else:
                         self.oligo_conc /= 10
                 self.update_current(self.sequence)

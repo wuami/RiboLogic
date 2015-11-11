@@ -1,4 +1,3 @@
-import ensemble_design, ensemble_utils, eterna_utils, inv_utils, design_utils
 import switch_designer
 import sys, os
 import json
@@ -11,8 +10,8 @@ import signal
 
 def get_objective_dict(o):
     n = len(o['secstruct'])
-    constrained = ensemble_design.get_sequence_array('o'*n)
-    struct = ensemble_design.get_sequence_array(o['secstruct'])
+    constrained = ['o']*n
+    struct = list(o['secstruct'])
     if 'anti_structure_constrained_bases' in o.keys() and len(o['anti_structure_constrained_bases']) > 0:
         for i in range(0, len(o['anti_structure_constrained_bases']), 2):
             [lo, hi] = o['anti_structure_constrained_bases'][i:i+2]
@@ -39,8 +38,8 @@ def get_objective_dict(o):
             for j in range(lo, hi+1):
                 constrained[j] = 'p'
         del o['structure_paired_constrained_bases']
-    o['secstruct'] = ensemble_design.get_sequence_string(struct)
-    o['constrained'] = ensemble_design.get_sequence_string(constrained)
+    o['secstruct'] = "".join(struct)
+    o['constrained'] = "".join(constrained)
     return o
     
 def read_puzzle_json(text, **kwargs):
@@ -99,8 +98,6 @@ def optimize_n(puzzle, niter, ncool, n, **kwargs):
                 solutions.append(sol[0])
                 scores.append(sol[2])
                 print sol
-                if 'submit' in kwargs and kwargs['submit']:
-                    post_solution(puzzle, 'solution %s' % i)
                 if 'draw' in kwargs and kwargs['draw']:
                     puzzle.draw_solution(i)
                 if 'fout' in kwargs and kwargs['fout']:
@@ -184,35 +181,6 @@ def post_solutions(puzzleid, filename, mode):
         print i
     return
 
-def post_solution(puzzleid, title, sequence, score):
-    fold = inv_utils.fold(sequence)
-    design = eterna_utils.get_design_from_sequence(sequence, fold[0])
-    header = {'Content-Type': 'application/x-www-form-urlencoded'}
-    login = {'type': 'login',
-             'name': 'theeternabot',
-             'pass': 'iamarobot',
-             'workbranch': 'main'}
-    solution = {'type': 'post_solution',
-                'puznid': puzzleid,
-                'title': title,
-                'body': 'eternabot solution, score %s' % score,
-                'sequence': sequence,
-                'energy': fold[1],
-                'gc': design['gc'],
-                'gu': design['gu'],
-                'ua': design['ua'],
-                'melt': design['meltpoint'],
-                'pointsrank': 'false',
-                'recommend-puzzle': 'true'}
-
-    url = "http://jnicol.eternadev.org"
-    loginurl = "%s/login/" % url
-    posturl = "%s/post/" % url
-    with requests.Session() as s:
-        r = s.post(loginurl, data=login, headers=header)
-        r = s.post(posturl, data=solution, headers=header)
-    return
-
 def view_sequence(puzzle, seq):
     puzzle.update_sequence(seq)
     puzzle.update_best()
@@ -229,8 +197,7 @@ def main():
     p.add_argument('-o', '--ncool', help="number of times to cool", type=int, default=50)
     p.add_argument('-m', '--mode', help="mode for multi inputs", type=str, default="vienna")
     p.add_argument('-s', '--score', help="scoring function", type=str, default="bpp")
-    p.add_argument('-c', '--conc', help="starting oligo concentration", type=float, default=1e-7)
-    p.add_argument('--submit', help="submit the solution(s)", default=False, action='store_true')
+    p.add_argument('-c', '--conc', help="starting oligo concentration", type=float, default=1)
     p.add_argument('--draw', help="draw the solution(s)", default=False, action='store_true')
     p.add_argument('--nowrite', help="suppress write to file", default=False, action='store_true')
     p.add_argument('--cotrans', help="enable cotranscriptional folding", default=False, action='store_true')
@@ -251,9 +218,9 @@ def main():
     
     # find solutions
     if args.time:
-        [solutions, scores] = optimize_timed(puzzle, args.niter, args.ncool, args.time, submit=args.submit, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_timed(puzzle, args.niter, args.ncool, args.time, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
     else:
-        [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, submit=args.submit, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
 
 if __name__ == "__main__":
     #unittest.main()

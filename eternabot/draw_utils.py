@@ -2,7 +2,7 @@ import argparse
 import settings
 import os
 import varna
-import inv_utils
+import fold_utils
 
 def get_colormaps(targets, inputs, input_pos, sequence_length, n):
     if n == 2:
@@ -28,9 +28,9 @@ def get_colormaps(targets, inputs, input_pos, sequence_length, n):
 
 def draw_secstruct_state(v, target, foldseq, colormap, filename):
     if "fold_constraint" in target:
-        secstruct = inv_utils.fold(foldseq, target['fold_constraint'])[0]
+        secstruct = fold_utils.fold(foldseq, target['fold_constraint'])[0]
     else:
-        secstruct = inv_utils.fold(foldseq)[0]
+        secstruct = fold_utils.fold(foldseq)[0]
     print secstruct
     foldseq = foldseq.replace("&", "\&")
     highlight = ""

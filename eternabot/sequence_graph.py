@@ -1,4 +1,4 @@
-import ensemble_design, design_utils, eterna_utils
+import design_utils
 import random
 import networkx as nx
 import matplotlib.pyplot as plt
@@ -54,12 +54,12 @@ class SequenceGraph(object):
         set sequence back to inital
         """
         self.sequence = self._get_full_sequence(sequence)
-        seq_array = ensemble_design.get_sequence_array(self.sequence)
+        seq_array = list(self.sequence)
         if self.autocomplement:
             for i in range(self.N):
                 if self.seq_locks[i] == "x":
                     self.update_neighbors(i, seq_array, [])
-        self.sequence = ensemble_design.get_sequence_string(seq_array)
+        self.sequence = "".join(seq_array)
         if self.add_rcs:
             self.init_oligo_rcs()
 
@@ -76,8 +76,8 @@ class SequenceGraph(object):
         self.set_oligo_rc(inputs[0], oligo1_start)
         oligo2_start = [x + self.seq_offset for x in [self.n-len(inputs[1]), self.n]]
         self.set_oligo_rc(inputs[1], oligo2_start)
-        self.pmut = 0.2
-        self.pexpand = 0.8
+        self.pmut = 0.3
+        self.pexpand = 0.5
         self.pshift = 0.5
 
     def set_oligo_rc(self, seq, range):
@@ -140,7 +140,7 @@ class SequenceGraph(object):
                 target['full_secstruct'] = self._get_full_secstruct(target['secstruct'], target['inputs'])
             else:
                 target['full_secstruct'] = target['secstruct']
-            pairmap = eterna_utils.get_pairmap_from_secstruct(target['full_secstruct'])
+            pairmap = design_utils.get_pairmap_from_secstruct(target['full_secstruct'])
             for i, j in enumerate(pairmap):
                 if j > i:
                     graph.add_edge(i,j)
@@ -210,11 +210,11 @@ class SequenceGraph(object):
         if shift:
             expand = 0
         else:
-            if self.oligo_len[roligo][1]-self.oligo_len[roligo][0] <= 0:
+            if self.oligo_len[roligo][1]-self.oligo_len[roligo][0] <= 1:#len(self.oligo_rc[roligo])/2:
                 expand = 1
-            if self.oligo_len[roligo][1]-self.oligo_len[roligo][0] == len(self.oligo_rc)-1:
+            elif self.oligo_len[roligo][1]-self.oligo_len[roligo][0] >= len(self.oligo_rc[roligo])-1:
                 expand = 0
-            if 'expand' not in locals():
+            else:
                 expand = random.random() < self.pexpand
 
 
@@ -226,7 +226,7 @@ class SequenceGraph(object):
                 right = 0
                 maxed_out = True
             if self.oligo_pos[roligo][0] <= 0 or self.oligo_pos[roligo][0] <= min_index or \
-               (self.oligo_len[roligo][0] <= len(self.oligo_rc[roligo])/2 and expand) or \
+               (self.oligo_len[roligo][0] <= 0 and expand) or \
                self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
                 right = 1
                 if maxed_out:
@@ -244,17 +244,17 @@ class SequenceGraph(object):
         if (random.random() < self.pmut): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
             return self.mutate_sequence()
 
-        mut_array = ensemble_design.get_sequence_array(self.sequence)
+        mut_array = list(self.sequence)
         roligo, shift, expand, right = self.get_rand_shift()
         # shift complement sequence
         if shift:
             if right:
-                mut_array[self.oligo_pos[roligo][0]] = ensemble_design.get_random_base(self.dep_graph.node[self.oligo_pos[roligo][0]]['bases'])
+                mut_array[self.oligo_pos[roligo][0]] = design_utils.get_random_base(self.dep_graph.node[self.oligo_pos[roligo][0]]['bases'])
                 self.oligo_pos[roligo] = [x+1 for x in self.oligo_pos[roligo]] 
             else:
                 self.oligo_pos[roligo] = [x-1 for x in self.oligo_pos[roligo]] 
-                mut_array[self.oligo_pos[roligo][1]] = ensemble_design.get_random_base(self.dep_graph.node[self.oligo_pos[roligo][1]]['bases'])
-            seq = ensemble_design.get_sequence_string(mut_array)
+                mut_array[self.oligo_pos[roligo][1]] = design_utils.get_random_base(self.dep_graph.node[self.oligo_pos[roligo][1]]['bases'])
+            seq = "".join(mut_array)
             start, end = self.oligo_pos[roligo]
             lo, hi = self.oligo_len[roligo]
             new_seq = seq[:start] + self.oligo_rc[roligo][lo:hi+1] + seq[end:]
@@ -276,31 +276,31 @@ class SequenceGraph(object):
                 self.oligo_pos[roligo][1] -= 1
                 self.oligo_len[roligo][1] -= 1
                 mutate_pos = self.oligo_pos[roligo][right]
-                mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos]['bases'])
+                mut_array[mutate_pos] = design_utils.get_random_base(self.dep_graph.node[mutate_pos]['bases'])
             else:
                 mutate_pos = self.oligo_pos[roligo][right]
-                mut_array[mutate_pos] = ensemble_design.get_random_base(self.dep_graph.node[mutate_pos]['bases'])
+                mut_array[mutate_pos] = design_utils.get_random_base(self.dep_graph.node[mutate_pos]['bases'])
                 self.oligo_pos[roligo][0] += 1
                 self.oligo_len[roligo][0] += 1 
         self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
         print self.oligo_pos, self.oligo_len
-        return ensemble_design.get_sequence_string(mut_array)
+        return "".join(mut_array)
 
     def mutate_sequence(self):
         """ mutate one random position """
         while True:
-            mut_array = ensemble_design.get_sequence_array(self.sequence)
+            mut_array = list(self.sequence)
             if random.random() < 0.9 or len(self.index_array[1]) == 0 and len(self.index_array[0]) != 0:
                 rindex = self.index_array[0][int(random.random() * len(self.index_array[0]))]
             else:
                 rindex = self.index_array[1][int(random.random() * len(self.index_array[1]))]
-            rbase = ensemble_design.get_random_base(self.dep_graph.node[rindex]['bases'])
+            rbase = design_utils.get_random_base(self.dep_graph.node[rindex]['bases'])
             mut_array[rindex] = rbase
             if self.autocomplement:
                 self.update_neighbors(rindex, mut_array, [])
             if design_utils.satisfies_constraints(mut_array, self.sequence, self.seq_locks):
                 break
-        return ensemble_design.get_sequence_string(mut_array)
+        return "".join(mut_array)
 
     def update_neighbors(self, node, mut_array, updated):
         """
