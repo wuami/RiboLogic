@@ -57,7 +57,6 @@ def nupack_fold(seq, oligo_conc, bpp=False):
     """
     finds most prevalent structure using nupack partition function
     """
-    print oligo_conc
     os.system("source ~/.bashrc")
     rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
     split = seq.split("&")
@@ -85,9 +84,7 @@ def nupack_fold(seq, oligo_conc, bpp=False):
         for line in f_eq:
             if not line.startswith("%"):
                 complex = line.strip().split()
-                if int(complex[len(split)+1]) and not bpp:
-                    break
-                if all([int(x) for x in complex[2:(2+len(split))]]) and bpp:
+                if int(complex[len(split)+1]):
                     break
     # get strand ordering
     with open("%s.ocx-key" % rand_string) as f_key:
@@ -111,7 +108,7 @@ def nupack_fold(seq, oligo_conc, bpp=False):
         if i+1 not in strands:
             secstruct += "&" + "."*len(split[i])
             strands.append(i+1)
-
+    
     if bpp:
         bpp_matrix = []
         with open("%s.cx-epairs" % rand_string) as f_pairs:

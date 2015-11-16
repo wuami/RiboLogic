@@ -209,17 +209,16 @@ class SwitchDesigner(object):
         if self.print_:
             print "reset %s" % self.sequence
 
-    def update_current(self, sequence, native=None, bp_distance=None, score=None, energies=None):
+    def update_current(self, sequence, native=None, bp_distance=None, design_score=None, energies=None):
         """
         updates current sequence and related information
         """
         self.sequence = sequence
         if not native:
             [sequence, native, bp_distance, fold_sequences, design_score] = self.get_sequence_info(sequence)
-            score = self.get_design_score(fold_sequences)
         self.native = native
         self.bp_distance = bp_distance
-        self.design_score = score
+        self.design_score = design_score
 
     def update_best(self):
         """
@@ -335,10 +334,6 @@ class SwitchDesigner(object):
             mut_sequence = self.sequence_graph.mutate()
             [mut_sequence, native, bp_distance, fold_sequences, design_score] = self.get_sequence_info(mut_sequence)
 
-            if self.best_bp_distance != 0 and bp_distance == 0:
-                niter = i
-                print "-> Reached solution in %d iterations." % i
-            
             # if distance or score is better for mutant, update the current sequence
             p = p_func(self.bp_distance, bp_distance)
             if(random.random() <= p):
@@ -358,8 +353,10 @@ class SwitchDesigner(object):
                    (bp_distance == self.best_bp_distance and design_score > self.best_design_score)):
                     self.update_best()
 
-            if self.best_bp_distance == 0 and self.oligo_conc == 1 and not continue_opt:
-                return i
+            if self.best_bp_distance == 0 and self.oligo_conc == 1.0:
+                print "-> Reached solution in %d iterations." % i
+                if not continue_opt:
+                    return i
 
             # decrease temperature
             #if i % (n_iterations/n_cool) == 0:
@@ -371,12 +368,11 @@ class SwitchDesigner(object):
                     T = 1
             
             # update oligo_conc
-            if self.best_bp_distance == 0:
-                if self.oligo_conc > 1:
-                    if self.oligo_conc/10 <= 1:
-                        self.oligo_conc = 1
-                    else:
-                        self.oligo_conc /= 10
+            while self.best_bp_distance == 0 and self.oligo_conc != 1.0:
+                if self.oligo_conc/10 <= 1.0:
+                    self.oligo_conc = 1.0
+                else:
+                    self.oligo_conc /= 10
                 self.update_current(self.sequence)
                 self.update_best()
         
