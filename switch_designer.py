@@ -33,20 +33,12 @@ class SwitchDesigner(object):
         self.scoring_func = design_utils.get_bpp_scoring_func(targets, self.mode == "nupack")
 
         #if type == "multi_input_oligo":
-        self.bp_distance_func = design_utils.bp_distance_with_unpaired
+        self.bp_distance_func = design_utils.bp_distance
         self.greedy = False
         self.oligo_conc = 1e7
-        if self.mode == "hairpin":
-            self.hp_mismatch = False
 
         # target information
         self.n_targets = len(self.targets)
-        if "pos" in self.inputs:
-            self.input_pos = self.inputs['pos']
-            self.input_pos.insert(0,0)
-            del self.inputs['pos']
-        else:
-            self.input_pos = [0]*(len(self.inputs)+1)
         n_cores = min(16, self.n_targets)
         
         # update dependency graph
@@ -100,12 +92,10 @@ class SwitchDesigner(object):
                 target['constrained'] = "".join(constrained)
         return targets
 
-    def get_fold_sequence(self, sequence, objective):
+    def get_fold_sequence(self, sequence, target):
         """ append oligo sequences separated by & for type oligo """
-        if objective['type'] == 'oligo':
-            return '&'.join([sequence, objective['oligo_sequence']])
-        elif objective['type'] == 'oligos':
-            return '&'.join([self.inputs[x] for x in sorted(objective['inputs'])] + [sequence])
+        if target['type'] == 'oligos':
+            return '&'.join([self.inputs[x] for x in sorted(target['inputs'])] + [sequence])
         else:
             return sequence 
 
@@ -116,9 +106,7 @@ class SwitchDesigner(object):
         for i in range(self.n_targets):
             fold_sequence = self.get_fold_sequence(self.best_sequence, self.targets[i])
             print fold_sequence
-            if self.mode == "ghost":
-                print fold_utils.vienna_fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
-            elif self.mode == "hairpin" or self.mode == "vienna":
+            if self.mode == "vienna":
                 if self.targets[i]['type'] == "aptamer":
                     print fold_utils.vienna_fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
                 else:
@@ -132,9 +120,9 @@ class SwitchDesigner(object):
         # initiate varna RNA visualizer
         v = varna.Varna()
         
-        # get puzzle object and generate colormaps for each objective
+        # get puzzle object and generate colormaps for each target
         n = len(self.inputs)
-        colormap = draw_utils.get_colormaps(self.targets, self.inputs, self.input_pos, self.n, self.linker_length, self.design_linker, n)
+        colormap = draw_utils.get_colormaps(self.targets, self.inputs, self.n, self.linker_length, self.design_linker, n)
         
         # draw image for each condition
         for i, target in enumerate(self.targets):
@@ -184,9 +172,7 @@ class SwitchDesigner(object):
         for i in range(self.n_targets):
             fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
             fold_sequences.append(fold_sequence)
-            if self.mode == "ghost":
-                native[i] = fold_utils.vienna_fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
-            elif self.mode == "hairpin" or self.mode == "vienna":
+            if self.mode == "vienna":
                 if self.targets[i]['type'] == "aptamer":
                     fold_list = fold_utils.vienna_fold(fold_sequences[i], self.cotrans, self.targets[i]['fold_constraint'])
                 else:

@@ -158,28 +158,13 @@ def optimize_timed(puzzle, niter, ncool, time, **kwargs):
 def get_puzzle(id, **kwargs):#mode, scoring, add_rcs, strandbonus, print_):
     puzzlefile = os.path.join(settings.PUZZLE_DIR, "%s.json" % id)
     if os.path.isfile(puzzlefile): 
+    try:
         with open(puzzlefile, 'r') as f:
             puzzle = read_puzzle_json(f.read(), **kwargs)#mode, scoring, add_rcs, strandbonus, print_)
-    else:
-        puzzle = get_puzzle_from_server(id, kwargs['mode'], kwargs['scoring'])
+    except:
+        print "File %s not found" % puzzlefile
+        sys.exit()
     return puzzle
-
-def get_puzzle_from_server(id, mode, scoring):
-    """
-    get puzzle with id number id from eterna server
-    """
-    r = requests.get('http://eternagame.org/get/?type=puzzle&nid=%s' % id)
-    return read_puzzle_json(r.text, mode=mode, scoring=scoring)
-
-def post_solutions(puzzleid, filename, mode):
-    filename = os.path.join(settings.PUZZLE_DIR, filename)
-    for i, sol in enumerate(open(filename, 'r')):
-        if sol.startswith('#'):
-            continue
-        spl = sol.split()
-        post_solution(puzzleid, "eternabot solution %s" % i, "UUUGCUCGUCUUAUCUUCUUCGC" +spl[0], spl[1])
-        print i
-    return
 
 def view_sequence(puzzle, seq):
     puzzle.update_sequence(seq)

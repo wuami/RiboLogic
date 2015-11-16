@@ -169,7 +169,7 @@ class SequenceGraph(object):
             if pos not in updated:
                 possible_bases = []
                 for base in bases:
-                    possible_bases.extend(design_utils.get_rcs(base))
+                    possible_bases.extend(design_utils.get_complements(base))
                 self.set_neighbor_sequence_constraints(pos, possible_bases, updated)
             
     def get_unconstrained_indices(self):

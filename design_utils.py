@@ -3,7 +3,7 @@ import random, math
 import re, string
 import os, subprocess
 
-def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
+def bp_distance(secstruct1, secstruct2, locks, threshold=0):
     """
     calculates distance between two secondary structures
     
@@ -15,9 +15,9 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
     returns:
     bp distance between structures
     """
-    order1 = ""
+    order = ""
     if isinstance(secstruct1, list):
-        order1 = secstruct1[1]
+        order = secstruct1[1]
         secstruct1 = secstruct1[0]
 
     # ensure that secondary structures are the same length
@@ -29,25 +29,25 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
         threshold = [[0,len(locks)-1,locks.count("u")]]
     
     # generate pair mappings
-    if order1:
-        pairmap1 = get_pairmap_from_secstruct([secstruct1, order1])
+    if order:
+        pairmap1 = get_pairmap_from_secstruct([secstruct1, order])
         ss_list = secstruct1.split('&')
-        secstruct1 = "&".join([ss_list[order1.index(x)] for x in range(1,len(order1)+1)])
+        secstruct1 = "&".join([ss_list[order.index(x)] for x in range(1,len(order)+1)])
     else:
         pairmap1 = get_pairmap_from_secstruct(secstruct1)
     pairmap2 = get_pairmap_from_secstruct(secstruct2)
     
     # +1 for each pair or single that doesn't match
     dist = 0
-    umatch = 0
+    match = 0
     j = 0
     for i in range(0,len(locks)):
         if(locks[i] == "u"):
             if(secstruct1[i] == secstruct2[i]):
-                umatch += 1
+                match += 1
         elif locks[i] == "p":
             if secstruct1[i] in ['(', ')']:
-                umatch += 1
+                match += 1
         elif locks[i] == "x":
             if(pairmap1[i] != pairmap2[i]):
                 if(pairmap1[i] > i):
@@ -57,45 +57,39 @@ def bp_distance_with_unpaired(secstruct1, secstruct2, locks, threshold=0):
         else:
             continue
         if i == threshold[j][1]:
-            dist += max(threshold[j][2]-umatch, 0)
+            dist += max(threshold[j][2]-match, 0)
             udist = 0
             if j != len(threshold)-1:
                 j += 1
     return dist
 
-class Scorer():
+class bpScorer():
+    """
+    class for base pair probability based scoring functions
+    """
     def __init__(self, targets, nupack):
-        self.MS2 = []
-        self.indices = []
         self.nupack = nupack
-        for target in targets:
-            i = target['secstruct'].find('(((((.((....)))))))')
-            if i == -1:
-                self.MS2.append(False)
-            else:
-                self.MS2.append(True)
-                self.indices = [i, i+18]
-        if not any(self.MS2):
-            self.scoring_func = self.pair_score
-            for target in targets:
-                pair_list = []
-                stack = []
-                for i in range(len(target['secstruct'])):
-                    if target['constrained'][i] == "x":
-                        if target['secstruct'][i] == "(":
-                            stack.append(i)
-                        elif target['secstruct'][i] == ")":
-                            j = stack.pop()
-                            pair_list.append([i,j])
-                        elif target['secstruct'][i] == ".":
-                            pair_list.append(-i)
-                    elif target['constrained'][i] == "p":
-                        pair_list.append(i)
-                self.indices.append(pair_list)
-        else:
-            self.scoring_func = self.MS2_score
+        self.scoring_func = self.pair_score
+        self.indices = []
 
-    def pair_score(self, sequences):
+        # get list of base pairs to score
+        for target in targets:
+            pair_list = []
+            stack = []
+            for i in range(len(target['secstruct'])):
+                if target['constrained'][i] == "x":
+                    if target['secstruct'][i] == "(":
+                        stack.append(i)
+                    elif target['secstruct'][i] == ")":
+                        j = stack.pop()
+                        pair_list.append([i,j])
+                    elif target['secstruct'][i] == ".":
+                        pair_list.append(-i)
+                elif target['constrained'][i] == "p":
+                    pair_list.append(i)
+            self.indices.append(pair_list)
+
+    def score(self, sequences):
         score = 0.0
         for i, sequence in enumerate(sequences):
             n = len(sequence)
@@ -115,70 +109,20 @@ class Scorer():
                     if len(values) != 0:
                         score += sum(values)
         return score
-
-    def MS2_score(self, sequences):
-        score = 0.0
-        for i, sequence in enumerate(sequences):
-            dotplot = get_dotplot(sequence, self.nupack)
-            p = [pair for pair in dotplot if (pair[0] == self.indices[0] and pair[1] == self.indices[1])]
-            if len(p) == 0:
-                p = 0
-            else:
-                p = p[0][2]
-            if self.MS2[i]:
-                score += p
-            else:
-                score -= p
-        return score*len(sequences[0])/len(sequences)
-
-    def score(self, designs):
-        return self.scoring_func(designs)
             
 def get_bpp_scoring_func(targets, nupack): 
-    s = Scorer(targets, nupack)
+    """
+    get scorer for base pair probability based scoring function
+    """
+    s = bpScorer(targets, nupack)
     return s.score
-
 
 def get_dotplot(sequence, nupack=False, constraint=False):
     """ run ViennaRNA to get bp probability matrix """
     if nupack:
         return fold_utils.nupack_fold(sequence, nupack, bpp=True)
-    filename = "".join(random.sample(string.lowercase,5))
-    with open(filename+".fa",'w') as f:
-        f.write(">%s\n" % filename)
-        f.write("%s\n" % sequence)
-        if constraint:
-            options = " -C"
-            f.write("%s\n" % constraint)
-        else:
-            options = ""
-    if '&' in sequence:
-        subprocess.call(os.path.join(settings.VIENNA_DIR,'RNAcofold') + options + ' -T 37.0 -p < %s' % filename + ".fa", shell=True, stdout=subprocess.PIPE)
     else:
-        subprocess.call(os.path.join(settings.VIENNA_DIR,'RNAfold') + options + ' -T 37.0 -p < %s' % filename + ".fa", shell=True, stdout=subprocess.PIPE)
-
-    # get info from output file
-    try:
-        file = open("%s_dp.ps" % filename, "r")
-    except IOError:
-        print "Can't find %s_dp.ps!" % filename
-        sys.exit()
-
-    dotps = file.read()
-    file.close()
-    os.remove(filename + ".fa")
-    os.remove(filename + "_dp.ps")
-    os.remove(filename + "_ss.ps")
-
-    lines = re.findall('(\d+)\s+(\d+)\s+(\d*\.*\d*)\s+ubox',dotps)
-
-    # create matrix containing index i, index j and pair probability
-    dots = []
-
-    for ii in range(0,len(lines)):
-        dots.append([int(lines[ii][0]) - 1, int(lines[ii][1]) - 1, float(lines[ii][2])])
-
-    return dots
+        return fold_utils.vienna_fold(sequence, bpp=True)
 
 def get_pairmap_from_secstruct(secstruct):
     """
@@ -260,18 +204,15 @@ def get_pairmap_from_secstruct(secstruct):
 def get_random_base(bases = "AUGC"): 
     """
     generates random base
-    
-    args:
-    none
-    
-    returns:
-    random base as char
     """
     nbases = len(bases)
     randn = int(math.floor(random.random() * nbases) % nbases)
     return bases[randn]
 
-def get_rcs(base):
+def get_complements(base):
+    """
+    gets all possible complements of a base
+    """
     if base == "G":
         return ["U", "C"]
     elif base == "U":
@@ -284,7 +225,10 @@ def get_rcs(base):
         raise ValueError("invalid base: %s" % base)
 
 def rc_single(base, pGU=0, possible_bases="AUGC"):
-    complements = get_rcs(base) 
+    """
+    gets a complement of a single base, given possible choices and probability of GU pairs
+    """
+    complements = get_complements(base) 
     if not any([b in possible_bases for b in complements]):
         raise ValueError("no complements to %s in %s" % (base, str(possible_bases)))
     if len(complements) > 1:
@@ -296,12 +240,18 @@ def rc_single(base, pGU=0, possible_bases="AUGC"):
         return complements[0] 
 
 def rc(bases, pGU=0, possible_bases="AUGC"):
+    """
+    gets reverse complement of a sequence
+    """
     rc = ""
     for base in bases:
         rc += rc_single(base, pGU, possible_bases)
     return rc[::-1]
 
 def satisfies_constraints(sequence, beginseq, constraints):
+    """
+    determines if given sequence satisfies sequence constraints
+    """
     for i,letter in enumerate(constraints):
         if letter == "o":
             continue

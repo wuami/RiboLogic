@@ -1,6 +1,6 @@
 import subprocess, re, string, random, os, settings
 
-def vienna_fold(seq, cotransc=False, constraint=False):
+def vienna_fold(sequence, constraint=False, bpp=False):
     """
     folds sequence using Vienna
 
@@ -10,27 +10,50 @@ def vienna_fold(seq, cotransc=False, constraint=False):
     returns:
     secondary structure
     """
-    # run ViennaRNA
-    if constraint:
-        options = "-C"
-        input = seq + "\n" + constraint
+    filename = "".join(random.sample(string.lowercase,5))
+    with open(filename+".fa",'w') as f:
+        f.write(">%s\n" % filename)
+        f.write("%s\n" % sequence)
+        if constraint:
+            options = " -C"
+            f.write("%s\n" % constraint)
+        else:
+            options = ""
+    if bpp:
+        options += " -p"
     else:
-        options = ""
-        input = ''.join(seq)
-    if cotransc:
-        p = subprocess.Popen([os.path.join(settings.VIENNA_DIR,'CoFold'), '--distAlpha', '0.5', '--distTau', '640', '--noPS', options], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
-    elif '&' in seq:
-        p = subprocess.Popen([os.path.join(settings.VIENNA_DIR,'RNAcofold'), '-T','37.0', '-noPS', options], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
+        options += " -noPS"
+    if '&' in sequence:
+        command = "RNAcofold"
     else:
-        p = subprocess.Popen([os.path.join(settings.VIENNA_DIR,'RNAfold'), '-T','37.0', '-noPS', options], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.STDOUT)
-    pair= p.communicate(input=input)[0]
-    p.wait()
+        command = "RNAfold"
+    output = subprocess.check_output(os.path.join(settings.VIENNA_DIR,command) + options + ' -T 37.0 < %s' % filename + ".fa", shell=True)
 
-    # parse the result
-    toks = re.search('([AUGC]+)\s*([\.\)\(]+)\s+\(\s*([-0-9\.]+)\s*\)', pair)
-    return [toks.group(2), float(toks.group(3))]
+    if bpp:
+        # get info from output file
+        try:
+            with open("%s_dp.ps" % filename) as f:
+                ps = f.read()
+        except IOError:
+            print "Can't find %s_dp.ps!" % filename
+            sys.exit()
 
-def nupack_fold(seq, oligo_conc, bpp = False):
+        os.system("rm %s.*" % filename)
+
+        # create bpp matrix from file
+        lines = re.findall('(\d+)\s+(\d+)\s+(\d*\.*\d*)\s+ubox',ps)
+        dots = []
+        for ii in range(0,len(lines)):
+            dots.append([int(lines[ii][0]) - 1, int(lines[ii][1]) - 1, float(lines[ii][2])])
+        return dots
+    else:
+        os.system("rm %s.*" % filename)
+        
+        # parse the result
+        toks = re.search('([AUGC]+)\s*([\.\)\(]+)\s+\(\s*([-0-9\.]+)\s*\)', output)
+        return [toks.group(2), float(toks.group(3))]
+
+def nupack_fold(seq, oligo_conc, bpp=False):
     """
     finds most prevalent structure using nupack partition function
     """
