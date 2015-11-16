@@ -70,9 +70,11 @@ class bpScorer():
     def __init__(self, targets, nupack):
         self.nupack = nupack
         self.indices = []
+        self.n = []
 
         # get list of base pairs to score
         for target in targets:
+            self.n.append(len(target['secstruct']))
             pair_list = []
             stack = []
             for i in range(len(target['secstruct'])):
@@ -88,11 +90,10 @@ class bpScorer():
                     pair_list.append(i)
             self.indices.append(pair_list)
 
-    def score(self, sequences):
+    def score(self, dotplots):
         score = 0.0
-        for i, sequence in enumerate(sequences):
-            n = len(sequence)
-            dotplot = get_dotplot(sequence, self.nupack)
+        for i, dotplot in enumerate(dotplots):
+            n = self.n[i]
             pair_list = self.indices[i]
             for item in pair_list:
                 if isinstance(item, list):

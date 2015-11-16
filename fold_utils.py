@@ -29,6 +29,9 @@ def vienna_fold(sequence, constraint=False, bpp=False):
         command = "RNAfold"
     output = subprocess.check_output(os.path.join(settings.VIENNA_DIR,command) + options + ' -T 37.0 < %s' % filename + ".fa", shell=True)
 
+    # parse the result
+    toks = re.search('([AUGC]+)\s*([\.\)\(]+)\s+\(\s*([-0-9\.]+)\s*\)', output)
+
     if bpp:
         # get info from output file
         try:
@@ -38,25 +41,23 @@ def vienna_fold(sequence, constraint=False, bpp=False):
             print "Can't find %s_dp.ps!" % filename
             sys.exit()
 
-        os.system("rm %s*" % filename)
 
         # create bpp matrix from file
         lines = re.findall('(\d+)\s+(\d+)\s+(\d*\.*\d*)\s+ubox',ps)
-        dots = []
+        bpp_matrix = []
         for ii in range(0,len(lines)):
-            dots.append([int(lines[ii][0]) - 1, int(lines[ii][1]) - 1, float(lines[ii][2])])
-        return dots
-    else:
+            bpp_matrix.append([int(lines[ii][0]) - 1, int(lines[ii][1]) - 1, float(lines[ii][2])])
         os.system("rm %s*" % filename)
-        
-        # parse the result
-        toks = re.search('([AUGC]+)\s*([\.\)\(]+)\s+\(\s*([-0-9\.]+)\s*\)', output)
-        return [toks.group(2), float(toks.group(3))]
+        return [toks.group(2), float(toks.group(3)), bpp_matrix]
+    
+    os.system("rm %s*" % filename)
+    return [toks.group(2), float(toks.group(3))]
 
 def nupack_fold(seq, oligo_conc, bpp=False):
     """
     finds most prevalent structure using nupack partition function
     """
+    print oligo_conc
     os.system("source ~/.bashrc")
     rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
     split = seq.split("&")
@@ -105,6 +106,12 @@ def nupack_fold(seq, oligo_conc, bpp=False):
                 break
             line = f_mfe.readline()
 
+    # get full secondary structure
+    for i in range(len(split)):
+        if i+1 not in strands:
+            secstruct += "&" + "."*len(split[i])
+            strands.append(i+1)
+
     if bpp:
         bpp_matrix = []
         with open("%s.cx-epairs" % rand_string) as f_pairs:
@@ -120,12 +127,7 @@ def nupack_fold(seq, oligo_conc, bpp=False):
                     break
                 line = f_pairs.readline()
         os.system("rm %s*" % rand_string)
-        return bpp_matrix
+        return [secstruct.replace("+", "&"), float(energy), strands, bpp_matrix]
 
-    # get full secondary structure
-    for i in range(len(split)):
-        if i+1 not in strands:
-            secstruct += "&" + "."*len(split[i])
-            strands.append(i+1)
     os.system("rm %s*" % rand_string)
     return [secstruct.replace("+", "&"), float(energy), strands]

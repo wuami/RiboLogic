@@ -159,40 +159,42 @@ class SwitchDesigner(object):
         get sequence information - native fold, bp distance, pairmap, design
         for a particular sequence
         """
-        native = [""] * self.n_targets
-        energies = [0] * self.n_targets
+        native = [] 
+        energies = []
         fold_sequences = []
+        bpps = []
         if self.mode == "nupack":
+            result = [None] * self.n_targets
             p = multiprocessing.Pool(self.n_targets)
         for i in range(self.n_targets):
             fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
             fold_sequences.append(fold_sequence)
             if self.mode == "vienna":
                 if self.targets[i]['type'] == "aptamer":
-                    fold_list = fold_utils.vienna_fold(fold_sequences[i], self.targets[i]['fold_constraint'])
+                    fold_list = fold_utils.vienna_fold(fold_sequences[i], self.targets[i]['fold_constraint'], bpp=True)
                 else:
-                    fold_list = fold_utils.vienna_fold(fold_sequences[i])
-                fold = fold_list[0]
-                energy = fold_list[1]
-                native[i] = fold
+                    fold_list = fold_utils.vienna_fold(fold_sequences[i], bpp=True)
+                native.append(fold_list[0])
+                bpps.append(fold_list[2])
                 if self.aptamer:
-                    energies[i] = energy
+                    energies.append(fold_list[1])
             if self.mode == "nupack":
                 if self.targets[i]['type'] == "oligos" and isinstance(self.targets[i]['inputs'], dict):
-                    native[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, [x*self.oligo_conc for x in self.targets[i]['inputs'].values()]))
+                    result[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, [x*self.oligo_conc for x in self.targets[i]['inputs'].values()], True))
                 else:
-                    native[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, self.target_oligo_conc*self.oligo_conc))
+                    result[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, self.target_oligo_conc*self.oligo_conc, True))
         if self.mode == "nupack":
             p.close()
             p.join()
-            result = [x.get() for x in native]
+            result = [x.get() for x in result]
             native = [[x[0], x[2]] for x in result]
             energies = [x[1] for x in result]
+            bpps = [x[3] for x in result]
         if self.aptamer:
-            design_score = self.get_design_score(fold_sequences, energies)
+            design_score = self.get_design_score(bpps)
             bp_distance = self.score_secstructs(native, energies, sequence)
         else:
-            design_score = max(self.get_design_score(fold_sequences),0)
+            design_score = max(self.get_design_score(bpps),0)
             bp_distance = self.score_secstructs(native, sequence=sequence)
         return [sequence, native, bp_distance, fold_sequences, design_score]
 
