@@ -69,7 +69,6 @@ class bpScorer():
     """
     def __init__(self, targets, nupack):
         self.nupack = nupack
-        self.scoring_func = self.pair_score
         self.indices = []
 
         # get list of base pairs to score

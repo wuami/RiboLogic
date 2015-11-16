@@ -41,20 +41,15 @@ class SwitchDesigner(object):
         self.n_targets = len(self.targets)
         n_cores = min(16, self.n_targets)
         
-        # update dependency graph
-
-        #if type == "multi_input" or type == "multi_input_oligo":
-        #    self.create_target_secstructs()
-        self.cotrans = False
-        
         # print puzzle info
         print self.constraints
-        for i in targets:
-            print self.get_fold_sequence(self.sequence, i)
-            print i['secstruct']
-            print i['constrained']
-            if 'fold_constraint' in i:
-                print i['fold_constraint']
+        for i, target in enumerate(targets):
+            print "-> state %d" % i
+            print self.get_fold_sequence(self.sequence, target)
+            print target['secstruct']
+            print target['constrained']
+            if 'fold_constraint' in target:
+                print target['fold_constraint']
 
         self.update_current(*self.get_sequence_info(self.sequence))
         
@@ -108,9 +103,9 @@ class SwitchDesigner(object):
             print fold_sequence
             if self.mode == "vienna":
                 if self.targets[i]['type'] == "aptamer":
-                    print fold_utils.vienna_fold(fold_sequence, self.cotrans, self.targets[i]['fold_constraint'])[0]
+                    print fold_utils.vienna_fold(fold_sequence, self.targets[i]['fold_constraint'])[0]
                 else:
-                    print fold_utils.vienna_fold(fold_sequence, self.cotrans)[0]
+                    print fold_utils.vienna_fold(fold_sequence)[0]
             else:
                 print fold_utils.nupack_fold(fold_sequence, self.target_oligo_conc*self.oligo_conc)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
@@ -174,24 +169,25 @@ class SwitchDesigner(object):
             fold_sequences.append(fold_sequence)
             if self.mode == "vienna":
                 if self.targets[i]['type'] == "aptamer":
-                    fold_list = fold_utils.vienna_fold(fold_sequences[i], self.cotrans, self.targets[i]['fold_constraint'])
+                    fold_list = fold_utils.vienna_fold(fold_sequences[i], self.targets[i]['fold_constraint'])
                 else:
-                    fold_list = fold_utils.vienna_fold(fold_sequences[i], self.cotrans)
+                    fold_list = fold_utils.vienna_fold(fold_sequences[i])
                 fold = fold_list[0]
                 energy = fold_list[1]
                 native[i] = fold
-            if self.aptamer:
-                energies[i] = energy
+                if self.aptamer:
+                    energies[i] = energy
             if self.mode == "nupack":
-                if isinstance(self.targets[i]['inputs'], dict):
+                if self.targets[i]['type'] == "oligos" and isinstance(self.targets[i]['inputs'], dict):
                     native[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, [x*self.oligo_conc for x in self.targets[i]['inputs'].values()]))
                 else:
                     native[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, self.target_oligo_conc*self.oligo_conc))
         if self.mode == "nupack":
             p.close()
             p.join()
-            native = [x.get() for x in native]
-            native = [[x[0], x[2]] for x in native]
+            result = [x.get() for x in native]
+            native = [[x[0], x[2]] for x in result]
+            energies = [x[1] for x in result]
         if self.aptamer:
             design_score = self.get_design_score(fold_sequences, energies)
             bp_distance = self.score_secstructs(native, energies, sequence)
@@ -290,7 +286,7 @@ class SwitchDesigner(object):
     def check_current_secstructs(self):
         return self.score_secstructs(self.best_native) == 0 and self.oligo_conc == 1
 
-    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, cotrans = None, print_ = None, start_oligo_conc=1e7, continue_opt=False):
+    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, print_ = None, start_oligo_conc=1e7, continue_opt=False):
         """
         monte-carlo optimization of the sequence
 
@@ -303,8 +299,6 @@ class SwitchDesigner(object):
     
         if greedy != None:
             self.greedy = greedy
-        if cotrans != None:
-            self.cotrans = cotrans
         if print_ != None:
             self.print_ = print_
 
@@ -341,7 +335,7 @@ class SwitchDesigner(object):
 
             if self.best_bp_distance != 0 and bp_distance == 0:
                 niter = i
-                print i
+                print "-> Reached solution in %d iterations." % i
             
             # if distance or score is better for mutant, update the current sequence
             p = p_func(self.bp_distance, bp_distance)
@@ -383,25 +377,6 @@ class SwitchDesigner(object):
                         self.oligo_conc /= 10
                 self.update_current(self.sequence)
                 self.update_best()
-                print self.native, self.bp_distance
-                print self.best_native, self.best_bp_distance
-            #    self.all_solutions.append([mut_sequence, score])
         
         return niter
-
-class test_functions(unittest.TestCase):
-
-    def setUp(self):
-        self.puzzle = read_puzzle_json('switch_input.json')
-
-    def test_check_secstructs(self):
-        sequence = "ACAAGCUUUUUGCUCGUCUUAUACAUGGGUAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA"
-        self.puzzle.update_current(*self.puzzle.get_sequence_info(sequence))
-        self.assertTrue(self.puzzle.check_current_secstructs())
-
-    def test_optimize_sequence(self):
-        sequence = "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAACAUGAGGAUCACCCAUGUAAAAAAAAAAAAAAAAAAA"
-        self.puzzle.update_current(*self.puzzle.get_sequence_info(sequence))
-        self.puzzle.optimize_sequence(1000)
-        print self.puzzle.get_solution()
 

@@ -283,7 +283,6 @@ class SequenceGraph(object):
                 self.oligo_pos[roligo][0] += 1
                 self.oligo_len[roligo][0] += 1 
         self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
-        print self.oligo_pos, self.oligo_len
         return "".join(mut_array)
 
     def mutate_sequence(self):

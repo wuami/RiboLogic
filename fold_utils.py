@@ -38,7 +38,7 @@ def vienna_fold(sequence, constraint=False, bpp=False):
             print "Can't find %s_dp.ps!" % filename
             sys.exit()
 
-        os.system("rm %s.*" % filename)
+        os.system("rm %s*" % filename)
 
         # create bpp matrix from file
         lines = re.findall('(\d+)\s+(\d+)\s+(\d*\.*\d*)\s+ubox',ps)
@@ -47,7 +47,7 @@ def vienna_fold(sequence, constraint=False, bpp=False):
             dots.append([int(lines[ii][0]) - 1, int(lines[ii][1]) - 1, float(lines[ii][2])])
         return dots
     else:
-        os.system("rm %s.*" % filename)
+        os.system("rm %s*" % filename)
         
         # parse the result
         toks = re.search('([AUGC]+)\s*([\.\)\(]+)\s+\(\s*([-0-9\.]+)\s*\)', output)
@@ -128,4 +128,4 @@ def nupack_fold(seq, oligo_conc, bpp=False):
             secstruct += "&" + "."*len(split[i])
             strands.append(i+1)
     os.system("rm %s*" % rand_string)
-    return [secstruct.replace("+", "&"), energy, strands]
+    return [secstruct.replace("+", "&"), float(energy), strands]

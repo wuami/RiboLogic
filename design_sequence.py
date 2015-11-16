@@ -90,22 +90,19 @@ def optimize_n(puzzle, niter, ncool, n, **kwargs):
     attempts = 0
     while i < n:
         puzzle.reset_sequence()
-        passkwargs = {key:kwargs[key] for key in ['greedy', 'cotrans', 'start_oligo_conc']}
+        passkwargs = {key:kwargs[key] for key in ['greedy', 'start_oligo_conc']}
         nfin = puzzle.optimize_sequence(niter, ncool, **passkwargs)
         if puzzle.check_current_secstructs():
             sol = puzzle.get_solution()
             if sol[0] not in solutions:
                 solutions.append(sol[0])
                 scores.append(sol[2])
-                print sol
                 if 'draw' in kwargs and kwargs['draw']:
                     puzzle.draw_solution(i)
                 if 'fout' in kwargs and kwargs['fout']:
                     params = ""
                     if 'greedy' in kwargs and kwargs['greedy']:
                         params += "greedy "
-                    if 'cotrans' in kwargs and kwargs['cotrans']:
-                        params += "cotranscriptional"
                     with open(kwargs['fout'], 'a') as f:
                         f.write("# %s out of %s iterations, %s coolings, %s\n" % (nfin, niter, ncool, params))
                         f.write("%s\t%1.6f\n" % (sol[0], sol[2]))
@@ -135,7 +132,7 @@ def optimize_timed(puzzle, niter, ncool, time, **kwargs):
     try:
         while True:
             puzzle.reset_sequence()
-            passkwargs = {key:kwargs[key] for key in ['greedy', 'cotrans', 'start_oligo_conc']}
+            passkwargs = {key:kwargs[key] for key in ['greedy', 'start_oligo_conc']}
             n = puzzle.optimize_sequence(niter, ncool, **passkwargs)
             if puzzle.check_current_secstructs():
                 sol = puzzle.get_solution()
@@ -157,13 +154,12 @@ def optimize_timed(puzzle, niter, ncool, time, **kwargs):
 
 def get_puzzle(id, **kwargs):#mode, scoring, add_rcs, strandbonus, print_):
     puzzlefile = os.path.join(settings.PUZZLE_DIR, "%s.json" % id)
-    if os.path.isfile(puzzlefile): 
-    try:
-        with open(puzzlefile, 'r') as f:
-            puzzle = read_puzzle_json(f.read(), **kwargs)#mode, scoring, add_rcs, strandbonus, print_)
-    except:
-        print "File %s not found" % puzzlefile
-        sys.exit()
+    #try:
+    with open(puzzlefile, 'r') as f:
+        puzzle = read_puzzle_json(f.read(), **kwargs)#mode, scoring, add_rcs, strandbonus, print_)
+    #except:
+    #    print "File %s not found" % puzzlefile
+    #    sys.exit()
     return puzzle
 
 def view_sequence(puzzle, seq):
@@ -185,7 +181,6 @@ def main():
     p.add_argument('-c', '--conc', help="starting oligo concentration", type=float, default=1)
     p.add_argument('--draw', help="draw the solution(s)", default=False, action='store_true')
     p.add_argument('--nowrite', help="suppress write to file", default=False, action='store_true')
-    p.add_argument('--cotrans', help="enable cotranscriptional folding", default=False, action='store_true')
     p.add_argument('--print_', help="print sequences throughout optimization", default=False, action='store_true')
     p.add_argument('--greedy', help="greedy search", default=False, action='store_true')
     p.add_argument('--add_rcs', help="introduce reverse complement of input oligos", default=False, action='store_true')
@@ -203,9 +198,9 @@ def main():
     
     # find solutions
     if args.time:
-        [solutions, scores] = optimize_timed(puzzle, args.niter, args.ncool, args.time, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_timed(puzzle, args.niter, args.ncool, args.time, draw=args.draw, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
     else:
-        [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, draw=args.draw, fout=fout, cotrans=args.cotrans, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_n(puzzle, args.niter, args.ncool, args.nsol, draw=args.draw, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
 
 if __name__ == "__main__":
     #unittest.main()
