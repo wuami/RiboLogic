@@ -15,24 +15,24 @@ def bp_distance(secstruct1, secstruct2, locks, threshold=0):
     returns:
     bp distance between structures
     """
-    order = ""
+    order = ''
     if isinstance(secstruct1, list):
         order = secstruct1[1]
         secstruct1 = secstruct1[0]
 
     # ensure that secondary structures are the same length
     if(len(secstruct1) != len(secstruct2)):
-        print "SS1 (%s) and SS2 (%s) lengths don't match" % (len(secstruct1), len(secstruct2))
+        print 'SS1 (%s) and SS2 (%s) lengths don\'t match' % (len(secstruct1), len(secstruct2))
         sys.exit(0)
 
     if not threshold:
-        threshold = [[0,len(locks)-1,locks.count("u")]]
+        threshold = [[0,len(locks)-1,locks.count('u')]]
     
     # generate pair mappings
     if order:
         pairmap1 = get_pairmap_from_secstruct([secstruct1, order])
         ss_list = secstruct1.split('&')
-        secstruct1 = "&".join([ss_list[order.index(x)] for x in range(1,len(order)+1)])
+        secstruct1 = '&'.join([ss_list[order.index(x)] for x in range(1,len(order)+1)])
     else:
         pairmap1 = get_pairmap_from_secstruct(secstruct1)
     pairmap2 = get_pairmap_from_secstruct(secstruct2)
@@ -42,13 +42,13 @@ def bp_distance(secstruct1, secstruct2, locks, threshold=0):
     match = 0
     j = 0
     for i in range(0,len(locks)):
-        if(locks[i] == "u"):
+        if(locks[i] == 'u'):
             if(secstruct1[i] == secstruct2[i]):
                 match += 1
-        elif locks[i] == "p":
+        elif locks[i] == 'p':
             if secstruct1[i] in ['(', ')']:
                 match += 1
-        elif locks[i] == "x":
+        elif locks[i] == 'x':
             if(pairmap1[i] != pairmap2[i]):
                 if(pairmap1[i] > i):
                     dist += 1
@@ -78,15 +78,15 @@ class bpScorer():
             pair_list = []
             stack = []
             for i in range(len(target['secstruct'])):
-                if target['constrained'][i] == "x":
-                    if target['secstruct'][i] == "(":
+                if target['constrained'][i] == 'x':
+                    if target['secstruct'][i] == '(':
                         stack.append(i)
-                    elif target['secstruct'][i] == ")":
+                    elif target['secstruct'][i] == ')':
                         j = stack.pop()
                         pair_list.append([i,j])
-                    elif target['secstruct'][i] == ".":
+                    elif target['secstruct'][i] == '.':
                         pair_list.append(-i)
-                elif target['constrained'][i] == "p":
+                elif target['constrained'][i] == 'p':
                     pair_list.append(i)
             self.indices.append(pair_list)
 
@@ -134,7 +134,7 @@ def get_pairmap_from_secstruct(secstruct):
     returns:
     dictionary with pair mappings
     """
-    order = ""
+    order = ''
     if isinstance(secstruct, list):
         order = secstruct[1]
         secstruct = secstruct[0]
@@ -151,18 +151,18 @@ def get_pairmap_from_secstruct(secstruct):
 
     # assign pairs based on secstruct
     for ii in i_range:
-        if(secstruct[ii] == "("):
+        if(secstruct[ii] == '('):
             pair_stack.append(ii)
-        elif(secstruct[ii] == ")"):
+        elif(secstruct[ii] == ')'):
             if not pair_stack:
                 end_stack.append(ii)
             else:
                 index = pair_stack.pop()
                 pairs_array[index] = ii
                 pairs_array[ii] = index
-        elif secstruct[ii] == "[":
+        elif secstruct[ii] == '[':
             pk_pair_stack.append(ii)
-        elif secstruct[ii] == "]":
+        elif secstruct[ii] == ']':
             if not pk_pair_stack:
                 pk_end_stack.append(ii)
             else:
@@ -175,7 +175,7 @@ def get_pairmap_from_secstruct(secstruct):
             pairs_array[pair_stack[ii]] = end_stack[-ii]
             pairs_array[end_stack[-ii]] = pair_stack[ii]
     else:
-         print "ERROR: pairing incorrect %s" % secstruct
+         print 'ERROR: pairing incorrect %s' % secstruct
 
     # adjust pairs array for strand ordering
     if order:
@@ -201,7 +201,7 @@ def get_pairmap_from_secstruct(secstruct):
             
     return pairs_array
 
-def get_random_base(bases = "AUGC"): 
+def get_random_base(bases = 'AUGC'): 
     """
     generates random base
     """
@@ -213,24 +213,24 @@ def get_complements(base):
     """
     gets all possible complements of a base
     """
-    if base == "G":
-        return ["U", "C"]
-    elif base == "U":
-        return ["G", "A"]
-    elif base == "A":
-        return ["U"]
-    elif base == "C":
-        return ["G"]
+    if base == 'G':
+        return ['U', 'C']
+    elif base == 'U':
+        return ['G', 'A']
+    elif base == 'A':
+        return ['U']
+    elif base == 'C':
+        return ['G']
     else:
-        raise ValueError("invalid base: %s" % base)
+        raise ValueError('invalid base: %s' % base)
 
-def rc_single(base, pGU=0, possible_bases="AUGC"):
+def rc_single(base, pGU=0, possible_bases='AUGC'):
     """
     gets a complement of a single base, given possible choices and probability of GU pairs
     """
     complements = get_complements(base) 
     if not any([b in possible_bases for b in complements]):
-        raise ValueError("no complements to %s in %s" % (base, str(possible_bases)))
+        raise ValueError('no complements to %s in %s' % (base, str(possible_bases)))
     if len(complements) > 1:
         if random.random() < pGU and complements[0] in possible_bases or complements[1] not in possible_bases:
             return complements[0]
@@ -239,11 +239,11 @@ def rc_single(base, pGU=0, possible_bases="AUGC"):
     else:
         return complements[0] 
 
-def rc(bases, pGU=0, possible_bases="AUGC"):
+def rc(bases, pGU=0, possible_bases='AUGC'):
     """
     gets reverse complement of a sequence
     """
-    rc = ""
+    rc = ''
     for base in bases:
         rc += rc_single(base, pGU, possible_bases)
     return rc[::-1]
@@ -253,7 +253,7 @@ def satisfies_constraints(sequence, beginseq, constraints):
     determines if given sequence satisfies sequence constraints
     """
     for i,letter in enumerate(constraints):
-        if letter == "o":
+        if letter == 'o':
             continue
         if beginseq[i] != sequence[i]:
             return False

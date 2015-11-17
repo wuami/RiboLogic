@@ -40,7 +40,7 @@ class SequenceGraph(object):
             self.printi = 0
             # draw dependency graph, for debugging
             nx.draw_circular(self.dep_graph, with_labels=True, node_color=[base_coloring[base] for base in self.sequence], node_size=60, font_size=5)
-            plt.savefig("dependency_graph%s.png" % self.printi, dpi=300)
+            plt.savefig('dependency_graph%s.png' % self.printi, dpi=300)
             self.printi += 1
         
         # set mutation function
@@ -57,9 +57,9 @@ class SequenceGraph(object):
         seq_array = list(self.sequence)
         if self.autocomplement:
             for i in range(self.N):
-                if self.seq_locks[i] == "x":
+                if self.seq_locks[i] == 'x':
                     self.update_neighbors(i, seq_array, [])
-        self.sequence = "".join(seq_array)
+        self.sequence = ''.join(seq_array)
         if self.add_rcs:
             self.init_oligo_rcs()
 
@@ -97,7 +97,7 @@ class SequenceGraph(object):
         get full secondary structure string with inputs
         """
         substrings = secstruct.split('&')
-        secstruct = ""
+        secstruct = ''
         i = 0
         for input in sorted(self.inputs):
             if input in inputs:
@@ -111,18 +111,18 @@ class SequenceGraph(object):
         """
         get full sequence constraint string with inputs
         """
-        constraint = ""
+        constraint = ''
         for input in sorted(self.inputs):
-            constraint += "x"*len(self.inputs[input]) + "o"
+            constraint += 'x'*len(self.inputs[input]) + 'o'
         return constraint + seq_locks
     
     def _get_full_sequence(self, sequence):
         """
         get full sequence string with inputs
         """
-        seq = ""
+        seq = ''
         for input in sorted(self.inputs):
-            seq += self.inputs[input] + "&"
+            seq += self.inputs[input] + '&'
         return seq + sequence
 
     def get_dependency_graph(self):
@@ -136,7 +136,7 @@ class SequenceGraph(object):
         graph = nx.Graph()
         graph.add_nodes_from(range(self.N), bases=['A','U','G','C'])
         for target in self.targets:
-            if "inputs" in target:
+            if 'inputs' in target:
                 target['full_secstruct'] = self._get_full_secstruct(target['secstruct'], target['inputs'])
             else:
                 target['full_secstruct'] = target['secstruct']
@@ -145,7 +145,7 @@ class SequenceGraph(object):
                 if j > i:
                     graph.add_edge(i,j)
         if not nx.is_bipartite(graph):
-            raise ValueError("dependency graph is not bipartite")
+            raise ValueError('dependency graph is not bipartite')
         self.dep_graph = graph
         if self.autocomplement:
             self.set_sequence_constraints()
@@ -156,7 +156,7 @@ class SequenceGraph(object):
         set sequence constraints for all positions based on graph structure
         """
         for i in range(len(self.seq_locks)):
-            if self.seq_locks[i] == "x":
+            if self.seq_locks[i] == 'x':
                 self.set_neighbor_sequence_constraints(i, [self.sequence[i]], [])
     
     def set_neighbor_sequence_constraints(self, i, bases, updated):
@@ -179,9 +179,9 @@ class SequenceGraph(object):
         open = []
         restricted = []
         for ii in range(0,self.N):
-            if(self.seq_locks[ii] == "o"):
+            if(self.seq_locks[ii] == 'o'):
                 open.append(ii)
-            elif self.seq_locks[ii] == "r":
+            elif self.seq_locks[ii] == 'r':
                 restricted.append(ii)
         return [open, restricted]
 
@@ -194,7 +194,7 @@ class SequenceGraph(object):
             if self.printi <= 20:
                 ## draw dependency graph, for debugging
                 nx.draw_circular(self.dep_graph, with_labels=True, node_color=[base_coloring[base] for base in self.sequence], node_size=60, font_size=5)
-                plt.savefig("dependency_graph%s.png" % self.printi, dpi=300)
+                plt.savefig('dependency_graph%s.png' % self.printi, dpi=300)
                 self.printi += 1
         return self.sequence[-self.n:]
 
@@ -254,11 +254,11 @@ class SequenceGraph(object):
             else:
                 self.oligo_pos[roligo] = [x-1 for x in self.oligo_pos[roligo]] 
                 mut_array[self.oligo_pos[roligo][1]] = design_utils.get_random_base(self.dep_graph.node[self.oligo_pos[roligo][1]]['bases'])
-            seq = "".join(mut_array)
+            seq = ''.join(mut_array)
             start, end = self.oligo_pos[roligo]
             lo, hi = self.oligo_len[roligo]
             new_seq = seq[:start] + self.oligo_rc[roligo][lo:hi+1] + seq[end:]
-            assert len(seq) == len(new_seq), "shifted sequence changed lengths"
+            assert len(seq) == len(new_seq), 'shifted sequence changed lengths'
             return new_seq
         # expand complement sequence
         if expand:
@@ -283,7 +283,7 @@ class SequenceGraph(object):
                 self.oligo_pos[roligo][0] += 1
                 self.oligo_len[roligo][0] += 1 
         self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
-        return "".join(mut_array)
+        return ''.join(mut_array)
 
     def mutate_sequence(self):
         """ mutate one random position """
@@ -299,7 +299,7 @@ class SequenceGraph(object):
                 self.update_neighbors(rindex, mut_array, [])
             if design_utils.satisfies_constraints(mut_array, self.sequence, self.seq_locks):
                 break
-        return "".join(mut_array)
+        return ''.join(mut_array)
 
     def update_neighbors(self, node, mut_array, updated):
         """
