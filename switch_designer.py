@@ -49,7 +49,7 @@ class SwitchDesigner(object):
                 if 'fold_constraint' in target:
                     print target['fold_constraint']
 
-        self.update_current(*self.get_sequence_info(self.sequence))
+        self.update_current(self.sequence)
         
         # maintain sequences
         self.update_best()
@@ -191,8 +191,8 @@ class SwitchDesigner(object):
             energies = [x[1] for x in result]
             bpps = [x[3] for x in result]
         design_score = max(self.get_design_score(bpps),0)
-        bp_distance = self.score_secstructs(native, energies, sequence)
-        return [sequence, native, bp_distance, fold_sequences, design_score]
+        bp_distance = self.score_secstructs(native, energies)
+        return [sequence, native, energies, bp_distance, fold_sequences, design_score]
 
     def reset_sequence(self):
         """
@@ -205,14 +205,15 @@ class SwitchDesigner(object):
         if self.print_:
             print 'reset %s' % self.sequence
 
-    def update_current(self, sequence, native=None, bp_distance=None, design_score=None, energies=None):
+    def update_current(self, sequence, native=None, energies=None, bp_distance=None, design_score=None):
         """
         updates current sequence and related information
         """
         self.sequence = sequence
         if not native:
-            [sequence, native, bp_distance, fold_sequences, design_score] = self.get_sequence_info(sequence)
+            [sequence, native, energies, bp_distance, fold_sequences, design_score] = self.get_sequence_info(sequence)
         self.native = native
+        self.energies = energies
         self.bp_distance = bp_distance
         self.design_score = design_score
 
@@ -222,10 +223,11 @@ class SwitchDesigner(object):
         """
         self.best_sequence = self.sequence
         self.best_native = self.native
+        self.best_energies = self.energies
         self.best_bp_distance = self.bp_distance
         self.best_design_score = self.design_score
 
-    def score_secstructs(self, secstruct, energies, sequence):
+    def score_secstructs(self, secstruct, energies):
         """
         calculates sum of bp distances for with and without oligo
 
@@ -254,26 +256,10 @@ class SwitchDesigner(object):
             if energy_compare['aptamer'] - 0.6 * math.log(energy_compare['ligand'][1]/3.0) > energy_compare['single']:
                 distance += 4
 
-        # test sequence
-        if sequence:
-            distance += 1 * sequence.count('GGGG')
-            distance += 1 * sequence.count('CCCC')
-            distance += 1 * sequence.count('AAAAA')
-
         return distance
 
-    def check_secstructs(self, secstruct):
-        """
-        checks if current sequence matches target secondary structures
-    
-        return:
-        boolean indicating whether the RNA folds to the targeted structure
-        with and without the oligo
-        """
-        return self.score_secstructs(secstruct) == 0
-
     def check_current_secstructs(self):
-        return self.score_secstructs(self.best_native) == 0 and self.oligo_conc == 1
+        return self.score_secstructs(self.best_native, self.best_energies) == 0 and self.oligo_conc == 1
 
     def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, print_ = None, start_oligo_conc=1e7, continue_opt=False):
         """
@@ -320,14 +306,14 @@ class SwitchDesigner(object):
             
             # pick random nucleotide in sequence
             mut_sequence = self.sequence_graph.mutate()
-            [mut_sequence, native, bp_distance, fold_sequences, design_score] = self.get_sequence_info(mut_sequence)
+            [mut_sequence, native, energies, bp_distance, fold_sequences, design_score] = self.get_sequence_info(mut_sequence)
 
             # if distance or score is better for mutant, update the current sequence
             p = p_func(self.bp_distance, bp_distance)
             if(random.random() <= p):
                 if self.bp_distance == bp_distance and p_func(self.design_score, design_score):
                     continue
-                self.update_current(mut_sequence, native, bp_distance, design_score)
+                self.update_current(mut_sequence, native, energies, bp_distance, design_score)
                 if self.print_:
                     print self.sequence, self.bp_distance, self.design_score
                     print 'conc: %s' % self.oligo_conc
