@@ -16,7 +16,7 @@ class SequenceGraph(object):
         """
 
         # set class variables
-        self.inputs = inputs
+        self.inputs = {key: value for key, value in inputs.items() if value['type'] == 'RNA'}
         self.targets = targets
         self.seq_locks = self._get_full_seqlocks(seq_locks)
         self.design_seq = sequence
@@ -71,7 +71,7 @@ class SequenceGraph(object):
         self.oligo_pos = []
         self.oligo_len = []
         self.oligo_len_sum = 0
-        inputs = self.inputs.values()
+        inputs = [input['sequence'] for input in self.inputs.values()]
         oligo1_start = [x + self.seq_offset for x in [0, len(inputs[0])]]
         self.set_oligo_rc(inputs[0], oligo1_start)
         oligo2_start = [x + self.seq_offset for x in [self.n-len(inputs[1]), self.n]]
@@ -104,7 +104,7 @@ class SequenceGraph(object):
                 secstruct += substrings[i] + '&'
                 i += 1
             else:
-                secstruct += '.'*len(self.inputs[input]) + '&'
+                secstruct += '.'*len(self.inputs[input]['sequence']) + '&'
         return secstruct + substrings[-1]
         
     def _get_full_seqlocks(self, seq_locks):
@@ -113,7 +113,7 @@ class SequenceGraph(object):
         """
         constraint = ''
         for input in sorted(self.inputs):
-            constraint += 'x'*len(self.inputs[input]) + 'o'
+            constraint += 'x'*len(self.inputs[input]['sequence']) + 'o'
         return constraint + seq_locks
     
     def _get_full_sequence(self, sequence):
@@ -130,7 +130,7 @@ class SequenceGraph(object):
         get dependency graph based on target secondary structures
         """
         # position of start of actual sequence in graph
-        self.seq_offset = sum([len(x) for x in self.inputs.values()]) + len(self.inputs)
+        self.seq_offset = sum([len(x['sequence']) for x in self.inputs.values()]) + len(self.inputs)
 
         # create graph
         graph = nx.Graph()

@@ -1,6 +1,6 @@
 import switch_designer
 import sys, os
-import json
+import json, re
 import argparse
 import requests
 import settings
@@ -56,7 +56,11 @@ def read_constraints_from_file(filename, **kwargs):
         while line:
             # read inputs
             if line.startswith('<'):
-                inputs[line.strip('<\n')] = f.readline().strip()
+                input = f.readline().strip()
+                try:
+                    inputs[line.strip('<\n')] = {'type':'ligand', 'kD': float(input), 'fold_constraint': f.readline().strip()}
+                except:
+                    inputs[line.strip('<\n')] = {'type':'RNA', 'sequence':f.readline().strip()}
             # read sequence constraints
             elif line.startswith('-'):
                 seq = f.readline().strip()
@@ -66,24 +70,31 @@ def read_constraints_from_file(filename, **kwargs):
             elif line.startswith('>'):
                 target = {}
                 target['type'] = line.strip('>\n')
-                target['inputs'] = {}
-                line = f.readline()
-                if not line.strip() == "":
-                    for input in line.split(';'):
-                        spl = input.split()
-                        if len(spl) > 1:
-                            target['inputs'][spl[0]] = float(spl[1])
-                        else:
-                            target['inputs'][spl[0]] = 1
+                if target['type'] != 'single':
+                    target['inputs'] = {}
+                    line = f.readline()
+                    if not line.strip() == "":
+                        for input in line.split(';'):
+                            spl = input.split()
+                            if len(spl) > 1:
+                                target['inputs'][spl[0]] = float(spl[1])
+                            else:
+                                target['inputs'][spl[0]] = 1
                 target['secstruct'] = f.readline().strip()
                 target['constrained'] = f.readline().strip()
                 line = f.readline()
-                if not line.strip():
-                    target['threshold'] = [int(x) for x in line.split()]
+                if not line.strip() == "":
+                    thresholds = [int(x) for x in line.split()]
+                    target['threshold'] = []
+                    r = re.compile("[up]+[ox]")
+                    for i,substruct in enumerate(r.finditer(target['constrained'])):
+                        target['threshold'].append([substruct.start(), 
+                                                    substruct.start() + len(substruct.group()) - 1,
+                                                    int(thresholds[i])])
                 targets.append(target)
             line = f.readline()
 
-    return switch_designer.SwitchDesigner(os.path.basename(filename), beginseq, constraints, targets, inputs=inputs, **kwargs)
+    return switch_designer.SwitchDesigner(os.path.basename(filename).split('.')[0], beginseq, constraints, targets, inputs=inputs, **kwargs)
     
 def read_puzzle_json(text, **kwargs):
     """
@@ -195,14 +206,10 @@ def optimize_timed(puzzle, niter, ncool, time, **kwargs):
             print '\t%s %d %d' % (solutions[i], scores[i], niters[i])
     return [solutions, scores]
 
-def get_puzzle(id, **kwargs):#mode, scoring, add_rcs, strandbonus, print_):
+def get_puzzle(id, **kwargs):
     puzzlefile = os.path.join(settings.PUZZLE_DIR, '%s.json' % id)
-    #try:
     with open(puzzlefile, 'r') as f:
-        puzzle = read_puzzle_json(f.read(), **kwargs)#mode, scoring, add_rcs, strandbonus, print_)
-    #except:
-    #    print 'File %s not found' % puzzlefile
-    #    sys.exit()
+        puzzle = read_puzzle_json(f.read(), **kwargs)
     return puzzle
 
 def view_sequence(puzzle, seq):
@@ -226,14 +233,13 @@ def main():
     p.add_argument('--print_', help='print sequences throughout optimization', default=False, action='store_true')
     p.add_argument('--greedy', help='greedy search', default=False, action='store_true')
     p.add_argument('--add_rcs', help='introduce reverse complement of input oligos', default=False, action='store_true')
-    p.add_argument('--strandbonus', help='bonus for interaction of oligo strands', default=False, action='store_true')
     args = p.parse_args()
 
     print args.puzzleid
 
     # read puzzle
-    #puzzle = get_puzzle(args.puzzleid, mode=args.mode, add_rcs=args.add_rcs, strandbonus=args.strandbonus, print_=args.print_)
-    puzzle = read_constraints_from_file(args.puzzleid, mode=args.mode, add_rcs=args.add_rcs, strandbonus=args.strandbonus, print_=args.print_)
+    #puzzle = get_puzzle(args.puzzleid, mode=args.mode, add_rcs=args.add_rcs, print_=args.print_)
+    puzzle = read_constraints_from_file(args.puzzleid, mode=args.mode, add_rcs=args.add_rcs, print_=args.print_)
     if not args.nowrite:
         fout = os.path.join(settings.PUZZLE_DIR, args.puzzleid + '_' + puzzle.mode + '.out')
     else:

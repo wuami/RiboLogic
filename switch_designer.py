@@ -19,10 +19,8 @@ class SwitchDesigner(object):
 
         self.mode = kwargs.get('mode', 'nupack')
         add_rcs = kwargs.get('add_rcs', False)
-        self.strandbonus = kwargs.get('strandbonus', False)
         self.print_ = kwargs.get('print_', False)
         self.inputs = kwargs.get('inputs', {})
-        self.aptamer = False
 
         self.targets = self.parse_targets(targets)
         self.sequence_graph = sequence_graph.SequenceGraph(self.inputs, targets, constraints, beginseq, add_rcs, False, autocomplement=True)
@@ -66,19 +64,20 @@ class SwitchDesigner(object):
             constrained = ''
             if target['type'] == 'oligos' and len(target['inputs']) > 0 and '&' not in target['secstruct']:
                 for input in target['inputs']:
-                    secstruct += '.'*len(self.inputs[input]) + '&'
-                    constrained += 'o'*len(self.inputs[input]) + 'x'
+                    if self.inputs[input]['type'] == 'RNA':
+                        secstruct += '.'*len(self.inputs[input]['sequence']) + '&'
+                        constrained += 'o'*len(self.inputs[input]['sequence']) + 'x'
                 target['secstruct'] = secstruct + target['secstruct']
                 target['constrained'] = constrained + target['constrained']
-            elif target['type'] == 'aptamer':
-                self.aptamer = float(target['concentration'])
-                fold_constraint = list(target['secstruct'])
-                for i, fold in enumerate(fold_constraint):
-                    if i in target['site'] and fold == '.':
-                        fold_constraint[i] = 'x'
-                    elif i not in target['site']:
-                        fold_constraint[i] = '.'
-                target['fold_constraint'] = ''.join(fold_constraint)
+            #elif target['type'] == 'aptamer':
+            #    self.aptamer = float(target['concentration'])
+            #    fold_constraint = list(target['secstruct'])
+            #    for i, fold in enumerate(fold_constraint):
+            #        if i in target['site'] and fold == '.':
+            #            fold_constraint[i] = 'x'
+            #        elif i not in target['site']:
+            #            fold_constraint[i] = '.'
+            #    target['fold_constraint'] = ''.join(fold_constraint)
             if '&' in target['secstruct']:
                 breaks = [i for i, char in enumerate(target['secstruct']) if char == '&']
                 constrained = list(target['constrained'])
@@ -90,7 +89,7 @@ class SwitchDesigner(object):
     def get_fold_sequence(self, sequence, target):
         """ append oligo sequences separated by & for type oligo """
         if target['type'] == 'oligos':
-            return '&'.join([self.inputs[x] for x in sorted(target['inputs'])] + [sequence])
+            return '&'.join([self.inputs[x]['sequence'] for x in sorted(target['inputs']) if self.inputs[x]['type'] == 'RNA' ] + [sequence])
         else:
             return sequence 
 
@@ -103,7 +102,7 @@ class SwitchDesigner(object):
             print fold_sequence
             if self.mode == 'vienna':
                 if self.targets[i]['type'] == 'aptamer':
-                    print fold_utils.vienna_fold(fold_sequence, self.targets[i]['fold_constraint'])[0]
+                    print fold_utils.vienna_fold(fold_sequences[i], ligand['fold_constraint'], bpp=False)[0]
                 else:
                     print fold_utils.vienna_fold(fold_sequence)[0]
             else:
@@ -117,7 +116,8 @@ class SwitchDesigner(object):
         
         # get puzzle object and generate colormaps for each target
         n = len(self.inputs)
-        colormap = draw_utils.get_colormaps(self.targets, self.inputs, self.n, self.linker_length, self.design_linker, n)
+        inputs = {key: value['sequence'] for key, value in self.inputs.items() if value['type'] == 'RNA'}
+        colormap = draw_utils.get_colormaps(self.targets, inputs, self.n, self.linker_length, self.design_linker, n)
         
         # draw image for each condition
         for i, target in enumerate(self.targets):
@@ -171,13 +171,13 @@ class SwitchDesigner(object):
             fold_sequences.append(fold_sequence)
             if self.mode == 'vienna':
                 if self.targets[i]['type'] == 'aptamer':
-                    fold_list = fold_utils.vienna_fold(fold_sequences[i], self.targets[i]['fold_constraint'], bpp=True)
+                    ligand = self.inputs[self.targets[i]['inputs'].keys()[0]]
+                    fold_list = fold_utils.vienna_fold(fold_sequences[i], ligand['fold_constraint'], bpp=True)
                 else:
                     fold_list = fold_utils.vienna_fold(fold_sequences[i], bpp=True)
                 native.append(fold_list[0])
+                energies.append(fold_list[1])
                 bpps.append(fold_list[2])
-                if self.aptamer:
-                    energies.append(fold_list[1])
             if self.mode == 'nupack':
                 if self.targets[i]['type'] == 'oligos' and isinstance(self.targets[i]['inputs'], dict):
                     result[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, [x*self.oligo_conc for x in self.targets[i]['inputs'].values()], True))
@@ -190,12 +190,8 @@ class SwitchDesigner(object):
             native = [[x[0], x[2]] for x in result]
             energies = [x[1] for x in result]
             bpps = [x[3] for x in result]
-        if self.aptamer:
-            design_score = self.get_design_score(bpps)
-            bp_distance = self.score_secstructs(native, energies, sequence)
-        else:
-            design_score = max(self.get_design_score(bpps),0)
-            bp_distance = self.score_secstructs(native, sequence=sequence)
+        design_score = max(self.get_design_score(bpps),0)
+        bp_distance = self.score_secstructs(native, energies, sequence)
         return [sequence, native, bp_distance, fold_sequences, design_score]
 
     def reset_sequence(self):
@@ -229,41 +225,33 @@ class SwitchDesigner(object):
         self.best_bp_distance = self.bp_distance
         self.best_design_score = self.design_score
 
-    def score_secstructs(self, secstruct, energies = False, sequence = False):
+    def score_secstructs(self, secstruct, energies, sequence):
         """
         calculates sum of bp distances for with and without oligo
 
         returns:
         sum of bp distances with and without the oligo 
         """
-        # test for secondary structure matches
+       # test for secondary structure matches
+        energy_compare = {}
         distance = 0.0
         strands_interacting = 0.0
         n_strands = 0.0
-        for i in range(self.n_targets):
-            if 'threshold' in self.targets[i]:
-                distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'], self.targets[i]['threshold'])
+        for i, target in enumerate(self.targets):
+            if 'threshold' in target:
+                distance += self.bp_distance_func(secstruct[i], target['secstruct'], target['constrained'], target['threshold'])
             else:
-                distance += self.bp_distance_func(secstruct[i], self.targets[i]['secstruct'], self.targets[i]['constrained'])
-            if self.mode == 'nupack':
-                strands = secstruct[i][0].split('&')
-                for strand in secstruct[i][1]:
-                    if strand != len(strands):
-                        n_strands += 1
-                        if '(' in strands[strand-1] or ')' in strands[strand-1]:
-                            strands_interacting += 1
-
-        # add bonus for interaction of strands
-        if self.strandbonus:
-            if strands_interacting == 0:
-                strands_interacting += 1
-            distance /= strands_interacting/n_strands
-            if self.print_:
-                print 'bonus: %d' % distance
+                distance += self.bp_distance_func(secstruct[i], target['secstruct'], target['constrained'])
+            if target['type'] == 'aptamer':
+                energy_compare[target['type']] = energies[i]
+                ligand = target['inputs'].keys()[0]
+                energy_compare['ligand'] = self.inputs[ligand]['kD'], target['inputs'][ligand]
+            elif target['type'] == 'single':
+                energy_compare[target['type']] = energies[i]
 
         # test energies
-        if energies:
-            if energies[1] - 0.6 * math.log(self.aptamer/3.0) > energies[0]:
+        if 'aptamer' in energy_compare:
+            if energy_compare['aptamer'] - 0.6 * math.log(energy_compare['ligand'][1]/3.0) > energy_compare['single']:
                 distance += 4
 
         # test sequence
