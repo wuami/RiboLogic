@@ -122,7 +122,7 @@ class SequenceGraph(object):
         """
         seq = ''
         for input in sorted(self.inputs):
-            seq += self.inputs[input] + '&'
+            seq += self.inputs[input]['sequence'] + '&'
         return seq + sequence
 
     def get_dependency_graph(self):

@@ -1,6 +1,5 @@
 import design_utils, fold_utils
 import sequence_graph
-import varna, draw_utils
 import settings
 import math, random
 import unittest
@@ -38,7 +37,7 @@ class SwitchDesigner(object):
         self.n_targets = len(self.targets)
         n_cores = min(16, self.n_targets)
         
-        # print puzzle info
+        # print design info
         if self.print_:
             print self.constraints
             for i, target in enumerate(targets):
@@ -109,21 +108,6 @@ class SwitchDesigner(object):
                 print fold_utils.nupack_fold(fold_sequence, self.target_oligo_conc*self.oligo_conc)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
 
-    def draw_solution(self, name):
-        """ draw each state for current solution """
-        # initiate varna RNA visualizer
-        v = varna.Varna()
-        
-        # get puzzle object and generate colormaps for each target
-        n = len(self.inputs)
-        inputs = {key: value['sequence'] for key, value in self.inputs.items() if value['type'] == 'RNA'}
-        colormap = draw_utils.get_colormaps(self.targets, inputs, self.n, self.linker_length, self.design_linker, n)
-        
-        # draw image for each condition
-        for i, target in enumerate(self.targets):
-            filename = '%s/images/%s_%s-%s.png' % (settings.PUZZLE_DIR, self.id, name, i)
-            draw_utils.draw_secstruct_state(v, target, self.get_fold_sequence(self.sequence, target), colormap, filename)
-
     def get_solutions(self):
         """
         return all possible solutions found
@@ -138,21 +122,12 @@ class SwitchDesigner(object):
         solution = self.all_solutions[r]
         return [solution[0], 0, solution[1]]
 
-    def get_design_score(self, sequences, energies=False):
+    def get_bpp_score(self, bpps):
         """
         calculates design score using scoring function
         """
-        # in a small number of cases, get_design function causes error
-        # if this happens, assume 0 score
-        #try:
-        if energies:
-            return energies[0] - energies[1]
-        if not self.scoring_func:
-            return 0
-        score = self.scoring_func(sequences)
+        score = self.scoring_func(bpps)
         return score
-        #except:
-        #    return 0
 
     def get_sequence_info(self, sequence):
         """
@@ -190,7 +165,7 @@ class SwitchDesigner(object):
             native = [[x[0], x[2]] for x in result]
             energies = [x[1] for x in result]
             bpps = [x[3] for x in result]
-        design_score = max(self.get_design_score(bpps),0)
+        design_score = max(self.get_bpp_score(bpps),0)
         bp_distance = self.score_secstructs(native, energies)
         return [sequence, native, energies, bp_distance, fold_sequences, design_score]
 
