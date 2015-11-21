@@ -77,8 +77,6 @@ def optimize_n(design, niter, ncool, n, **kwargs):
             if sol[0] not in solutions:
                 solutions.append(sol[0])
                 scores.append(sol[2])
-                if 'draw' in kwargs and kwargs['draw']:
-                    design.draw_solution(i)
                 if 'fout' in kwargs and kwargs['fout']:
                     params = ''
                     if 'greedy' in kwargs and kwargs['greedy']:
@@ -138,31 +136,28 @@ def main():
     p.add_argument('filename', help='name of design filename', type=str)
     p.add_argument('-n', '--nsol', help='number of solutions', type=int, default=1)
     p.add_argument('-t', '--time', help='maximum time allowed', type=int)
-    p.add_argument('-i', '--niter', help='number of iterations', type=int, default=2000)
+    p.add_argument('-i', '--niter', help='number of iterations', type=int, default=10000)
     p.add_argument('-o', '--ncool', help='number of times to cool', type=int, default=50)
     p.add_argument('-m', '--mode', help='mode for multi inputs', type=str, default='nupack')
     p.add_argument('-c', '--conc', help='starting oligo concentration', type=float, default=1)
-    p.add_argument('--draw', help='draw the solution(s)', default=False, action='store_true')
     p.add_argument('--nowrite', help='suppress write to file', default=False, action='store_true')
     p.add_argument('--print_', help='print sequences throughout optimization', default=False, action='store_true')
     p.add_argument('--greedy', help='greedy search', default=False, action='store_true')
     p.add_argument('--add_rcs', help='introduce reverse complement of input oligos', default=False, action='store_true')
     args = p.parse_args()
 
-    print args.designid
-
     # read design
-    design = read_constraints_from_file(args.designid, mode=args.mode, add_rcs=args.add_rcs, print_=args.print_)
+    design = read_constraints_from_file(args.filename, mode=args.mode, add_rcs=args.add_rcs, print_=args.print_)
     if not args.nowrite:
-        fout = os.path.join(os.path.splittext(args.designid)[0] + '_' + design.mode + '.out')
+        fout = os.path.join(os.path.splitext(args.filename)[0] + '_' + design.mode + '.out')
     else:
         fout = False
     
     # find solutions
     if args.time:
-        [solutions, scores] = optimize_timed(design, args.niter, args.ncool, args.time, draw=args.draw, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_timed(design, args.niter, args.ncool, args.time, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
     else:
-        [solutions, scores] = optimize_n(design, args.niter, args.ncool, args.nsol, draw=args.draw, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_n(design, args.niter, args.ncool, args.nsol, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
 
 if __name__ == '__main__':
     #unittest.main()

@@ -16,27 +16,42 @@ class SwitchDesigner(object):
         self.n = len(self.sequence)
         self.constraints = constraints
 
+        # read keyword arguments
         self.mode = kwargs.get('mode', 'nupack')
         add_rcs = kwargs.get('add_rcs', False)
         self.print_ = kwargs.get('print_', False)
         self.inputs = kwargs.get('inputs', {})
 
+        # automatic folding mode detection
+        aptamer = False
+        if any([target['type'] == 'aptamer' for target in targets]):
+            aptamer = True
+        multi_oligos = False
+        if any([len(target['inputs']) > 1 for target in targets if 'inputs' in target]):
+            multi_oligos = True
+        if aptamer and multi_oligos:
+            print 'Unable to handle aptamers and multiple RNA inputs simultaneously'
+            sys.exit()
+        elif aptamer:
+            if self.mode != 'vienna':
+                print 'Switching to Vienna to handle aptamer'
+                self.mode = 'vienna'
+        elif multi_oligos:
+            if self.mode != 'nupack':
+                print 'Switching to NUPACK to handle multiple RNA inputs'
+                self.mode = 'nupack'
+
+        # process input data
         self.targets = self.parse_targets(targets)
+        self.n_targets = len(self.targets)
         self.sequence_graph = sequence_graph.SequenceGraph(self.inputs, targets, constraints, beginseq, add_rcs, False, autocomplement=True)
         self.target_oligo_conc = 1e-7
 
-        # scoring
+        # initialize default optimization parameters
         self.scoring_func = design_utils.get_bpp_scoring_func(targets, self.mode == 'nupack')
-
-        #if type == 'multi_input_oligo':
-        self.bp_distance_func = design_utils.bp_distance
         self.greedy = False
-        self.oligo_conc = 1e7
+        self.oligo_conc = 1.0
 
-        # target information
-        self.n_targets = len(self.targets)
-        n_cores = min(16, self.n_targets)
-        
         # print design info
         if self.print_:
             print self.constraints
@@ -52,7 +67,6 @@ class SwitchDesigner(object):
         
         # maintain sequences
         self.update_best()
-        self.all_solutions = []
 
     def parse_targets(self, targets):
         """
@@ -96,31 +110,19 @@ class SwitchDesigner(object):
         """
         return current best as solution
         """
-        for i in range(self.n_targets):
-            fold_sequence = self.get_fold_sequence(self.best_sequence, self.targets[i])
+        for i, target in enumerate(self.targets):
+            fold_sequence = self.get_fold_sequence(self.best_sequence, target)
             print fold_sequence
             if self.mode == 'vienna':
-                if self.targets[i]['type'] == 'aptamer':
-                    print fold_utils.vienna_fold(fold_sequences[i], ligand['fold_constraint'], bpp=False)[0]
+                if target['type'] == 'aptamer':
+                    ligand = self.inputs[target['inputs'].keys()[0]]
+                    print fold_utils.vienna_fold(fold_sequence, ligand['fold_constraint'], bpp=False)[0]
                 else:
                     print fold_utils.vienna_fold(fold_sequence)[0]
             else:
-                print fold_utils.nupack_fold(fold_sequence, self.target_oligo_conc*self.oligo_conc)[0]
+                concentrations = [target['inputs'][input]*self.oligo_conc for input in sorted(target['inputs'])]
+                print fold_utils.nupack_fold(fold_sequence, concentrations, False)[0]
         return [self.best_sequence, self.best_bp_distance, self.best_design_score]
-
-    def get_solutions(self):
-        """
-        return all possible solutions found
-        """
-        return self.all_solutions
-
-    def get_random_solution(self):
-        """
-        return a random solution
-        """
-        r = random.randint(0, len(self.all_solutions)-1)
-        solution = self.all_solutions[r]
-        return [solution[0], 0, solution[1]]
 
     def get_bpp_score(self, bpps):
         """
@@ -141,12 +143,12 @@ class SwitchDesigner(object):
         if self.mode == 'nupack':
             result = [None] * self.n_targets
             p = multiprocessing.Pool(self.n_targets)
-        for i in range(self.n_targets):
-            fold_sequence = self.get_fold_sequence(sequence, self.targets[i])
+        for i, target in enumerate(self.targets):
+            fold_sequence = self.get_fold_sequence(sequence, target)
             fold_sequences.append(fold_sequence)
             if self.mode == 'vienna':
-                if self.targets[i]['type'] == 'aptamer':
-                    ligand = self.inputs[self.targets[i]['inputs'].keys()[0]]
+                if target['type'] == 'aptamer':
+                    ligand = self.inputs[target['inputs'].keys()[0]]
                     fold_list = fold_utils.vienna_fold(fold_sequences[i], ligand['fold_constraint'], bpp=True)
                 else:
                     fold_list = fold_utils.vienna_fold(fold_sequences[i], bpp=True)
@@ -154,10 +156,11 @@ class SwitchDesigner(object):
                 energies.append(fold_list[1])
                 bpps.append(fold_list[2])
             if self.mode == 'nupack':
-                if self.targets[i]['type'] == 'oligos' and isinstance(self.targets[i]['inputs'], dict):
-                    result[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, [x*self.oligo_conc for x in self.targets[i]['inputs'].values()], True))
-                else:
-                    result[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, self.target_oligo_conc*self.oligo_conc, True))
+                #if self.targets[i]['type'] == 'oligos' and isinstance(self.targets[i]['inputs'], dict):
+                concentrations = [target['inputs'][input]*self.oligo_conc for input in sorted(target['inputs'])]
+                result[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, concentrations, True))
+                #else:
+                #    result[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, self.target_oligo_conc*self.oligo_conc, True))
         if self.mode == 'nupack':
             p.close()
             p.join()
@@ -176,7 +179,6 @@ class SwitchDesigner(object):
         self.sequence_graph.reset_sequence(self.beginseq)
         self.update_current(self.beginseq)
         self.update_best()
-        self.all_solutions = []
         if self.print_:
             print 'reset %s' % self.sequence
 
@@ -216,9 +218,9 @@ class SwitchDesigner(object):
         n_strands = 0.0
         for i, target in enumerate(self.targets):
             if 'threshold' in target:
-                distance += self.bp_distance_func(secstruct[i], target['secstruct'], target['constrained'], target['threshold'])
+                distance += design_utils.bp_distance(secstruct[i], target['secstruct'], target['constrained'], target['threshold'])
             else:
-                distance += self.bp_distance_func(secstruct[i], target['secstruct'], target['constrained'])
+                distance += design_utils.bp_distance(secstruct[i], target['secstruct'], target['constrained'])
             if target['type'] == 'aptamer':
                 energy_compare[target['type']] = energies[i]
                 ligand = target['inputs'].keys()[0]
@@ -251,9 +253,6 @@ class SwitchDesigner(object):
             self.greedy = greedy
         if print_ != None:
             self.print_ = print_
-
-        #print self.targets
-        #self.optimize_start_sequence()
 
         T = 5.0
         self.oligo_conc = start_oligo_conc
@@ -308,7 +307,6 @@ class SwitchDesigner(object):
                     return i
 
             # decrease temperature
-            #if i % (n_iterations/n_cool) == 0:
             wait = 0
             interval = n_iterations/(2*n_cool)
             if i % interval == 0 and i >= interval*wait and i < interval*(n_cool+wait):

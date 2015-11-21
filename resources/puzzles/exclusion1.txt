@@ -6,7 +6,7 @@
 NNNNNACAUGAGGAUCACCCAUGUNAGGAUAUNNNNNNNNNNNNNNNNNNNNNNNNNNNNAGAAGGNNNNNNNN
 
 >aptamer
-FMN 2370
+FMN 200
 ......................(((......(((........................))).....))).....
 oooooxxxxxxxxxxxxxxxxxxxxxxxxxxxxxooooooooooooooooooooooooxxxxxxxxxxxooooo
 
