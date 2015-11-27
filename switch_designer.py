@@ -11,6 +11,7 @@ class SwitchDesigner(object):
     def __init__(self, id, beginseq, constraints, targets, **kwargs):
         # sequence information
         self.id = id
+        beginseq = "CCAGAUGAAUUGUUCAAGUUAGUAGAUGGUGAUACAUGAGGAUCACCCAUGUGAAAUUAAGGAAUUAUUGUGGGGUCGGAUCUAG"
         self.beginseq = beginseq
         self.sequence = beginseq
         self.n = len(self.sequence)
@@ -21,6 +22,8 @@ class SwitchDesigner(object):
         add_rcs = kwargs.get('add_rcs', False)
         self.print_ = kwargs.get('print_', False)
         self.inputs = kwargs.get('inputs', {})
+        self.substrings = kwargs.get('substrings', [])
+        print self.substrings
 
         # automatic folding mode detection
         aptamer = False
@@ -169,7 +172,7 @@ class SwitchDesigner(object):
             energies = [x[1] for x in result]
             bpps = [x[3] for x in result]
         design_score = max(self.get_bpp_score(bpps),0)
-        bp_distance = self.score_secstructs(native, energies)
+        bp_distance = self.score_secstructs(sequence, native, energies)
         return [sequence, native, energies, bp_distance, fold_sequences, design_score]
 
     def reset_sequence(self):
@@ -204,7 +207,7 @@ class SwitchDesigner(object):
         self.best_bp_distance = self.bp_distance
         self.best_design_score = self.design_score
 
-    def score_secstructs(self, secstruct, energies):
+    def score_secstructs(self, sequence, secstruct, energies):
         """
         calculates sum of bp distances for with and without oligo
 
@@ -233,10 +236,14 @@ class SwitchDesigner(object):
             if energy_compare['aptamer'] - 0.6 * math.log(energy_compare['ligand'][1]/3.0) > energy_compare['single']:
                 distance += 4
 
+        for substr in self.substrings:
+            if substr in sequence:
+                distance += 1
+
         return distance
 
     def check_current_secstructs(self):
-        return self.score_secstructs(self.best_native, self.best_energies) == 0 and self.oligo_conc == 1
+        return self.score_secstructs(self.best_sequence, self.best_native, self.best_energies) == 0 and self.oligo_conc == 1
 
     def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, print_ = None, start_oligo_conc=1e7, continue_opt=False):
         """
@@ -285,7 +292,7 @@ class SwitchDesigner(object):
             # if distance or score is better for mutant, update the current sequence
             p = p_func(self.bp_distance, bp_distance)
             if(random.random() <= p):
-                if self.bp_distance == bp_distance and p_func(self.design_score, design_score):
+                if self.bp_distance == bp_distance and random.random() > p_func(design_score, self.design_score):
                     continue
                 self.update_current(mut_sequence, native, energies, bp_distance, design_score)
                 if self.print_:

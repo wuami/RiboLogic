@@ -16,6 +16,7 @@ def read_constraints_from_file(filename, **kwargs):
     targets = []
     beginseq = ''
     constraints = ''
+    substr = []
     
     with open(filename) as f:
         line = f.readline()
@@ -26,7 +27,7 @@ def read_constraints_from_file(filename, **kwargs):
                 try:
                     inputs[line.strip('<\n')] = {'type':'ligand', 'kD': float(input), 'fold_constraint': f.readline().strip()}
                 except:
-                    inputs[line.strip('<\n')] = {'type':'RNA', 'sequence':f.readline().strip()}
+                    inputs[line.strip('<\n')] = {'type':'RNA', 'sequence':input}
             # read sequence constraints
             elif line.startswith('-'):
                 seq = f.readline().strip()
@@ -58,9 +59,11 @@ def read_constraints_from_file(filename, **kwargs):
                                                     substruct.start() + len(substruct.group()) - 1,
                                                     int(thresholds[i])])
                 targets.append(target)
+            elif line.startswith('x'):
+                substr.append(line.strip('x\n'))
             line = f.readline()
 
-    return switch_designer.SwitchDesigner(os.path.basename(filename).split('.')[0], beginseq, constraints, targets, inputs=inputs, **kwargs)
+    return switch_designer.SwitchDesigner(os.path.basename(filename).split('.')[0], beginseq, constraints, targets, inputs=inputs, substrings=substr, **kwargs)
 
 def optimize_n(design, niter, ncool, n, **kwargs):
     # run design n times
