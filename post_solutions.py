@@ -1,5 +1,6 @@
 import os, sys
-import requests
+import requests, simplejson
+import fold_utils
 
 def count_pairs(sequence, secstruct):
     open = []
@@ -13,21 +14,22 @@ def count_pairs(sequence, secstruct):
                 pairs['gc'] += 1
             elif pair == "GU" or pair == "UG":
                 pairs['gu'] += 1
-            elif pair == "UA" or pair = "AU":
+            elif pair == "UA" or pair == "AU":
                 pairs['ua'] += 1
     return pairs
 
 def post_solutions(puzzleid, filename):
-    filename = os.path.join(settings.PUZZLE_DIR, filename)
-    for i, sol in enumerate(open(filename, 'r')):
+    i = 0
+    for sol in open(filename, 'r'):
         if sol.startswith('#'):
             continue
-        post_solution(puzzleid, "eternabot solution %s" % i, sol.strip())
+        post_solution(puzzleid, "eternabot solution %s" % i, sol.split()[0])
+        i += 1
     return
 
 def post_solution(puzzleid, title, sequence):
-    fold = fold_utils.nupack_fold(sequence)
-    pairs = count_pairs(sequence, fold[0][0])
+    fold = fold_utils.nupack_fold(sequence, [])
+    pairs = count_pairs(sequence, fold[0])
     header = {'Content-Type': 'application/x-www-form-urlencoded'}
     login = {'type': 'login',
              'name': 'theeternabot',
@@ -52,6 +54,12 @@ def post_solution(puzzleid, title, sequence):
     with requests.Session() as s:
         r = s.post(loginurl, data=login, headers=header)
         r = s.post(posturl, data=solution, headers=header)
+        j = simplejson.loads(r.text)
+        print "--> sequence: %s" % sequence
+        if "error" in j['data']:
+            print j['data']['error']
+        else:
+            print "successfully submitted"
     return
 
 def main():
