@@ -11,7 +11,6 @@ class SwitchDesigner(object):
     def __init__(self, id, beginseq, constraints, targets, **kwargs):
         # sequence information
         self.id = id
-        beginseq = "CCAGAUGAAUUGUUCAAGUUAGUAGAUGGUGAUACAUGAGGAUCACCCAUGUGAAAUUAAGGAAUUAUUGUGGGGUCGGAUCUAG"
         self.beginseq = beginseq
         self.sequence = beginseq
         self.n = len(self.sequence)
@@ -23,7 +22,6 @@ class SwitchDesigner(object):
         self.print_ = kwargs.get('print_', False)
         self.inputs = kwargs.get('inputs', {})
         self.substrings = kwargs.get('substrings', [])
-        print self.substrings
 
         # automatic folding mode detection
         aptamer = False
