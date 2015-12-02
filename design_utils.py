@@ -1,7 +1,7 @@
 import settings, fold_utils
 import random, math
 import re, string
-import os, subprocess
+import os, sys, subprocess
 
 def bp_distance(secstruct1, secstruct2, locks, threshold=0):
     """
@@ -84,8 +84,6 @@ class bpScorer():
                     elif target['secstruct'][i] == ')':
                         j = stack.pop()
                         pair_list.append([i,j])
-                    elif target['secstruct'][i] == '.':
-                        pair_list.append(-i)
                 elif target['constrained'][i] == 'p':
                     pair_list.append(i)
             self.indices.append(pair_list)
@@ -97,11 +95,7 @@ class bpScorer():
             pair_list = self.indices[i]
             for item in pair_list:
                 if isinstance(item, list):
-                    values = [pair[2] for pair in dotplot if (pair[0] == item[0] and pair[1] == item[1])]
-                    if len(values) != 0:
-                        score += sum(values)
-                elif item < 0:
-                    values = [pair[2] for pair in dotplot if (pair[0] == -item and pair[1] == n)]
+                    values = [pair[2] for pair in dotplot if set(pair[0:2]) == set(item[0:2])]
                     if len(values) != 0:
                         score += sum(values)
                 else:
