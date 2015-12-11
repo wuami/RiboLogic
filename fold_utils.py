@@ -1,4 +1,5 @@
-import subprocess, re, string, random, os, sys, settings
+import subprocess, os, sys, settings
+import re, string, random, itertools
 
 def vienna_fold(sequence, constraint=False, bpp=False):
     """
@@ -56,6 +57,22 @@ def vienna_fold(sequence, constraint=False, bpp=False):
     os.system('rm %s*' % filename)
     return [toks.group(2), float(toks.group(3))]
 
+def get_orderings(n):
+    """
+    get all possible orderings including last strand
+    """
+    all = []
+    # loop over number of strands
+    for i in range(1,n):
+        # loop over each possible combination
+        for order in list(itertools.combinations(range(1,n), i)):
+            # add last strand at each possible position
+            for j in range(1,i+1):
+                order_list = list(order)
+                order_list.insert(j,n)
+                all.append(order_list)
+    return all
+
 def nupack_fold(seq, oligo_conc, bpp=False):
     """
     finds most prevalent structure using nupack partition function
@@ -68,7 +85,10 @@ def nupack_fold(seq, oligo_conc, bpp=False):
         for seq in split:
             f.write('%s\n' % seq)
         f.write('1\n')
-    os.system('cp %s/%s.list %s.list' % (settings.NUPACK_DIR, len(split), rand_string))
+    orderings = get_orderings(len(split))
+    with open('%s.list' % rand_string, 'w') as f:
+        for ordering in orderings:
+            f.write('%s\n' % ' '.join([str(x) for x in ordering]))
     with open('%s.con' % rand_string, 'w') as f:
         if isinstance(oligo_conc, list):
             f.write('%s\n' % '\n'.join([str(x) for x in oligo_conc]))

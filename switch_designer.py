@@ -231,7 +231,7 @@ class SwitchDesigner(object):
 
         # test energies
         if 'aptamer' in energy_compare:
-            if energy_compare['aptamer'] - 0.6 * math.log(energy_compare['ligand'][1]/3.0) > energy_compare['single']:
+            if energy_compare['aptamer'] - 0.6 * math.log(energy_compare['ligand'][1]/energy_compare['ligand'][0]) > energy_compare['single']:
                 distance += 4
 
         for substr in self.substrings:

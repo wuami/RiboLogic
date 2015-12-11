@@ -100,7 +100,7 @@ class SequenceGraph(object):
         secstruct = ''
         i = 0
         for input in sorted(self.inputs):
-            if input in inputs and input['type'] == 'RNA':
+            if input in inputs and self.inputs[input]['type'] == 'RNA':
                 secstruct += substrings[i] + '&'
                 i += 1
             else:
