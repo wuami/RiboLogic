@@ -1,6 +1,6 @@
 <FMN
 3.0
-........................(xxxxxx(............................)xxxxx).......
+......................(((xxxxxx(((........................)))xxxxx))).....
 
 -sequence
 NNNNNACAUGAGGAUCACCCAUGUNAGGAUAUNNNNNNNNNNNNNNNNNNNNNNNNNNNNAGAAGGNNNNNNNN
@@ -8,8 +8,8 @@ NNNNNACAUGAGGAUCACCCAUGUNAGGAUAUNNNNNNNNNNNNNNNNNNNNNNNNNNNNAGAAGGNNNNNNNN
 >aptamer
 FMN 200
 ......................(((......(((........................))).....))).....
-oooooxxxxxxxxxxxxxxxxxxxxxxxxxxxxxooooooooooooooooooooooooxxxxxxxxxxxooooo
+ooooooooooooooooooooooxxxxxxxxxxxxooooooooooooooooooooooooxxxxxxxxxxxooooo
 
 >single
 .....(((((.((....)))))))..................................................
-oooooxxxxxxxxxxxxxxxxxxxxxxxxxxxxxooooooooooooooooooooooooxxxxxxxxxxxooooo
+oooooxxxxxxxxxxxxxxxxxxxoooooooooooooooooooooooooooooooooooooooooooooooooo
