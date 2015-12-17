@@ -23,7 +23,7 @@ def vienna_fold(sequence, constraint=False, bpp=False):
     if bpp:
         options += ' -p'
     else:
-        options += ' -noPS'
+        options += ' --noPS'
     if '&' in sequence:
         if sequence.count('&') > 1:
             print 'Cannot handle more than 2 strands with Vienna - try the nupack option'

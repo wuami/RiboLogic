@@ -50,9 +50,7 @@ def bp_distance(secstruct1, secstruct2, locks, threshold=0):
                 match += 1
         elif locks[i] == 'x':
             if(pairmap1[i] != pairmap2[i]):
-                if(pairmap1[i] > i):
-                    dist += 1
-                if(pairmap2[i] > i):
+                if(pairmap2[i] > i or pairmap2[i] == -1):
                     dist += 1
         else:
             continue
