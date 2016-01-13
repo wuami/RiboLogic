@@ -8,8 +8,8 @@ NNNNNNNNNNNNNAGGAUAUNNNNNNNNNNACAUGAGGAUCACCCAUGUNNNNNNNNNNNNNNNNNNAGAAGGNNNNNNN
 >aptamer
 FMN 200
 ..........(((......(((........(((((.((....)))))))................))).....)))..........
-oooooooooooooooooooooooooooooonnnnnonnoooonnnnnnnooooooooooooooooooooooooooooooooooooo
+ooooooooooxxxxxxxxxxxxooooooooxxxxxxxxxxxxxxxxxxxooooooooooooooooxxxxxxxxxxxoooooooooo
 
 >single
 ..........(((......(((........(((((.((....)))))))................))).....)))..........
-ooooooooooxxxxxxxxxxxxooooooooxxxxxxxxxxxxxxxxxxxooooooooooooooooxxxxxxxxxxxoooooooooo
+oooooooooooooooooooooooooooooonnnnnonnoooonnnnnnnooooooooooooooooooooooooooooooooooooo

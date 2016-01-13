@@ -56,10 +56,11 @@ target/
 *.ps
 *.fa
 *.out
-*.txt
 *.fold
 *.in
 *.ocx*
 *.eq
 *.con
 *.cx
+*.json
+*.out
