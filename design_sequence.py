@@ -32,7 +32,7 @@ def read_constraints_from_file(filename, **kwargs):
             elif line.startswith('-'):
                 seq = f.readline().strip()
                 beginseq = seq.replace('N', 'A')
-                constraints = ''.join(['o' if c == 'N' else 'x' for c in seq])
+                seq_locks = ''.join(['o' if c == 'N' else 'x' for c in seq])
             # read objectives
             elif line.startswith('>'):
                 target = {}
@@ -63,7 +63,8 @@ def read_constraints_from_file(filename, **kwargs):
                 substr.append(line.strip('x\n'))
             line = f.readline()
 
-    return switch_designer.SwitchDesigner(os.path.basename(filename).split('.')[0], beginseq, constraints, targets, inputs=inputs, substrings=substr, **kwargs)
+    design = switch_designer.Design(beginseq, seq_locks, targets, inputs, substrings=substr)
+    return switch_designer.SwitchDesigner(os.path.basename(filename).split('.')[0], design, **kwargs)
 
 def optimize_n(design, niter, ncool, n, **kwargs):
     # run design n times
@@ -75,18 +76,18 @@ def optimize_n(design, niter, ncool, n, **kwargs):
         design.reset_sequence()
         passkwargs = {key:kwargs[key] for key in ['greedy', 'start_oligo_conc']}
         nfin = design.optimize_sequence(niter, ncool, **passkwargs)
-        if design.check_current_secstructs():
+        if design.check_current():
             sol = design.get_solution()
-            if sol[0] not in solutions:
-                solutions.append(sol[0])
-                scores.append(sol[2])
+            if sol.sequence not in solutions:
+                solutions.append(sol.sequence)
+                scores.append(sol.design_score)
                 if 'fout' in kwargs and kwargs['fout']:
                     params = ''
                     if 'greedy' in kwargs and kwargs['greedy']:
                         params += 'greedy '
                     with open(kwargs['fout'], 'a') as f:
                         f.write('# %s out of %s iterations, %s coolings, %s\n' % (nfin, niter, ncool, params))
-                        f.write('%s\t%1.6f\n' % (sol[0], sol[2]))
+                        f.write('%s\t%1.6f\n' % (sol.sequence, sol.design_score))
                 i += 1
                 attempts = 0
         else:
@@ -115,7 +116,7 @@ def optimize_timed(design, niter, ncool, time, **kwargs):
             design.reset_sequence()
             passkwargs = {key:kwargs[key] for key in ['greedy', 'start_oligo_conc']}
             n = design.optimize_sequence(niter, ncool, **passkwargs)
-            if design.check_current_secstructs():
+            if design.check_current():
                 sol = design.get_solution()
                 solutions.append(sol[0])
                 scores.append(sol[2])
@@ -150,17 +151,17 @@ def main():
     args = p.parse_args()
 
     # read design
-    design = read_constraints_from_file(args.filename, mode=args.mode, add_rcs=args.add_rcs, print_=args.print_)
+    designer = read_constraints_from_file(args.filename, mode=args.mode, add_rcs=args.add_rcs, print_=args.print_)
     if not args.nowrite:
-        fout = os.path.join(os.path.splitext(args.filename)[0] + '_' + design.mode + '.out')
+        fout = os.path.join(os.path.splitext(args.filename)[0] + '_' + designer.mode + '.out')
     else:
         fout = False
     
     # find solutions
     if args.time:
-        [solutions, scores] = optimize_timed(design, args.niter, args.ncool, args.time, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_timed(designer, args.niter, args.ncool, args.time, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
     else:
-        [solutions, scores] = optimize_n(design, args.niter, args.ncool, args.nsol, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_n(designer, args.niter, args.ncool, args.nsol, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
 
 if __name__ == '__main__':
     #unittest.main()

@@ -9,33 +9,35 @@ base_coloring = {'A':'y', 'U':'b', 'G':'r', 'C':'g', '&':'w'}
 
 class SequenceGraph(object):
 
-    def __init__(self, inputs, targets, seq_locks, sequence, add_rcs, draw=False, autocomplement=True):
+    def __init__(self, design, **kwargs):
         """
         create graph structure to represent sequence
         given inputs, target secondary structures, sequence constraints
         """
 
         # set class variables
-        self.inputs = {key: value for key, value in inputs.items() if value['type'] == 'RNA'}
-        self.targets = targets
-        self.seq_locks = self._get_full_seqlocks(seq_locks)
-        self.design_seq = sequence
-        self.sequence = self._get_full_sequence(sequence)
-        self.n = len(sequence)
+        self.inputs = {key: value for key, value in design.inputs.items() if value['type'] == 'RNA'}
+        self.targets = design.targets
+        self.seq_locks = self._get_full_seqlocks(design.seq_locks)
+        self.design_seq = design.begin_seq
+        self.sequence = self._get_full_sequence(design.begin_seq)
+        self.n = len(self.design_seq)
         self.N = len(self.sequence)
-        self.autocomplement = autocomplement
+
+        # get options
+        self.add_rcs = kwargs.get('add_rcs', False)
+        self.draw = kwargs.get('draw', False)
+        self.autocomplement = kwargs.get('autocomplement', True)
 
         # create dependency graph
         self.index_array = self.get_unconstrained_indices()
         self.dep_graph = self.get_dependency_graph()
         #print self.dep_graph.nodes(data=True)
 
-        # update constrained parts of sequence
-        self.add_rcs = add_rcs
+        # update sequence
         self.reset_sequence(self.design_seq)
 
         # draw if option specified
-        self.draw = draw
         if self.draw:
             self.printi = 0
             # draw dependency graph, for debugging
@@ -44,7 +46,7 @@ class SequenceGraph(object):
             self.printi += 1
         
         # set mutation function
-        if add_rcs:
+        if self.add_rcs:
             self.mutate_func = self.mutate_or_shift
         else:
             self.mutate_func = self.mutate_sequence
@@ -57,8 +59,8 @@ class SequenceGraph(object):
         seq_array = list(self.sequence)
         if self.autocomplement:
             for i in range(self.N):
-                #if self.seq_locks[i] == 'x':
-                self.update_neighbors(i, seq_array, [])
+                if self.seq_locks[i] == 'x':
+                    self.update_neighbors(i, seq_array, [])
         self.sequence = ''.join(seq_array)
         if self.add_rcs:
             self.init_oligo_rcs()
