@@ -8,7 +8,7 @@ import varna
 import copy
 import signal
 
-def read_constraints_from_file(filename, **kwargs):
+def read_design_from_file(filename, **kwargs):
     """
     reads design information from text file
     """
@@ -63,7 +63,7 @@ def read_constraints_from_file(filename, **kwargs):
                 substr.append(line.strip('x\n'))
             line = f.readline()
 
-    design = switch_designer.Design(beginseq, seq_locks, targets, inputs, substrings=substr)
+    return switch_designer.Design(beginseq, seq_locks, targets, inputs, substrings=substr)
     return switch_designer.SwitchDesigner(os.path.basename(filename).split('.')[0], design, **kwargs)
 
 def optimize_n(design, niter, ncool, n, **kwargs):
@@ -151,7 +151,8 @@ def main():
     args = p.parse_args()
 
     # read design
-    designer = read_constraints_from_file(args.filename, mode=args.mode, add_rcs=args.add_rcs, print_=args.print_)
+    design = read_design_from_file(args.filename, mode=args.mode, add_rcs=args.add_rcs, print_=args.print_)
+    designer =  switch_designer.SwitchDesigner(os.path.basename(args.filename).split('.')[0], design, **vars(args))
     if not args.nowrite:
         fout = os.path.join(os.path.splitext(args.filename)[0] + '_' + designer.mode + '.out')
     else:

@@ -17,6 +17,7 @@ class Design(object):
         self.inputs = inputs
         self.targets = self.parse_targets(targets)
         self.n_targets = len(self.targets)
+        self.get_default_mode()
 
     def parse_targets(self, targets):
         """
@@ -59,6 +60,27 @@ class Design(object):
                 fold_sequences.append(sequence)
         return fold_sequences
     
+    def get_default_mode(self):
+        aptamer = False
+        if any([target['type'] == 'aptamer' for target in self.targets]):
+            aptamer = True
+        multi_oligos = False
+        if any([len(target['inputs']) > 1 for target in self.targets if 'inputs' in target]):
+            multi_oligos = True
+        if aptamer and multi_oligos:
+            print 'Unable to handle aptamers and multiple RNA inputs simultaneously'
+            sys.exit()
+        elif aptamer:
+            print 'Switching to Vienna to handle aptamer'
+            self.default_mode = 'vienna'
+        elif multi_oligos:
+            print 'Switching to NUPACK to handle multiple RNA inputs'
+            self.default_mode = 'nupack'
+        else:
+            self.default_mode = False
+
+        return self.default_mode
+
     def print_info(self):        
         print self.seq_locks
         fold_sequences = self.get_fold_sequences(self.begin_seq)
@@ -72,10 +94,10 @@ class Design(object):
 
 class DesignSequence(object):
 
-    def __init__(self, design, mode, sequence, oligo_conc = None):
+    def __init__(self, design, sequence, mode = 'nupack', oligo_conc = None):
         self.design = design
         self.n_targets = len(design.targets)
-        self.mode = mode
+        self.mode = design.default_mode if design.default_mode else mode
         self.scoring_func = design_utils.get_bpp_scoring_func(design.targets, self.mode == 'nupack')
 
         self.update_sequence(sequence, oligo_conc)
@@ -181,25 +203,6 @@ class SwitchDesigner(object):
         self.print_ = kwargs.get('print_', False)
         self.inputs = kwargs.get('inputs', {})
 
-        # automatic folding mode detection
-        aptamer = False
-        if any([target['type'] == 'aptamer' for target in design.targets]):
-            aptamer = True
-        multi_oligos = False
-        if any([len(target['inputs']) > 1 for target in design.targets if 'inputs' in target]):
-            multi_oligos = True
-        if aptamer and multi_oligos:
-            print 'Unable to handle aptamers and multiple RNA inputs simultaneously'
-            sys.exit()
-        elif aptamer:
-            if self.mode != 'vienna':
-                print 'Switching to Vienna to handle aptamer'
-                self.mode = 'vienna'
-        elif multi_oligos:
-            if self.mode != 'nupack':
-                print 'Switching to NUPACK to handle multiple RNA inputs'
-                self.mode = 'nupack'
-
         # process input data
         self.sequence_graph = sequence_graph.SequenceGraph(self.design, add_rcs=add_rcs)
         self.target_oligo_conc = 1e-7
@@ -214,6 +217,7 @@ class SwitchDesigner(object):
         # set designs to start
         self.reset_sequence()
 
+
     def get_solution(self):
         """
         return current best as solution
@@ -226,7 +230,7 @@ class SwitchDesigner(object):
         """
         sequence = self.design.begin_seq
         self.sequence_graph.reset_sequence(sequence)
-        self.current_design = DesignSequence(self.design, self.mode, sequence, self.oligo_conc)
+        self.current_design = DesignSequence(self.design, sequence, self.mode, self.oligo_conc)
         self.update_best()
         if self.print_:
             print 'reset %s' % sequence
@@ -288,7 +292,7 @@ class SwitchDesigner(object):
             
             # pick random nucleotide in sequence
             mut_sequence = self.sequence_graph.mutate()
-            mut_design = DesignSequence(self.design, self.mode, mut_sequence, self.oligo_conc)
+            mut_design = DesignSequence(self.design, mut_sequence, self.mode, self.oligo_conc)
 
             # if distance or score is better for mutant, update the current sequence
             p = p_func(self.current_design.bp_distance, mut_design.bp_distance)
