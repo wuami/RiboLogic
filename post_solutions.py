@@ -23,8 +23,13 @@ def post_solutions(puzzleid, filename):
     for sol in open(filename, 'r'):
         if sol.startswith('#'):
             continue
-        post_solution(puzzleid, "eternabot solution %s" % i, sol.split()[0])
-        i += 1
+        result = post_solution(puzzleid, "RiboLogic solution %s" % i, sol.split()[0])
+        if result == "successfully submitted":
+            print "success"
+            i += 1
+        else:
+            print "error: %s" % result
+    print "%d solutions successfully submitted" % i
     return
 
 def post_solution(puzzleid, title, sequence):
@@ -57,9 +62,9 @@ def post_solution(puzzleid, title, sequence):
         j = simplejson.loads(r.text)
         print "--> sequence: %s" % sequence
         if "error" in j['data']:
-            print j['data']['error']
+            return j['data']['error']
         else:
-            print "successfully submitted"
+            return "successfully submitted"
     return
 
 def main():

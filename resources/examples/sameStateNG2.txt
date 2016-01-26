@@ -1,0 +1,26 @@
+<FMN
+3.0
+........(((xxxxxx(((.............................................)))xxxxx)))........
+
+-sequence
+NNNNNNNNNNNAGGAUAUNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNAGAAGGNNNNNNNNNNN
+
+-variable
+ACAUGAGGAUCACCCAUGU
+
+>aptamer
+FMN 200
+........(((......(((.............................................))).....)))........
+ooooooooxxxxxxxxxxxxoooooooooooooooooooooooooooooooooooooooooooooxxxxxxxxxxxoooooooo
+(((((.((....)))))))
+xxxxxxxxxxxxxxxxxxx
+
+>single
+........(((......(((.............................................))).....)))........
+oooooooonnnoooooonnnooooooooooooooooooooooooooooooooooooooooooooonnnooooonnnoooooooo
+(((((.((....)))))))
+nnnnnonnoooonnnnnnn
+
+xGGGG
+xCCCC
+xAAAAA

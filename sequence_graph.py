@@ -74,13 +74,21 @@ class SequenceGraph(object):
         self.oligo_len = []
         self.oligo_len_sum = 0
         inputs = [input['sequence'] for input in self.inputs.values()]
-        oligo1_start = [x + self.seq_offset for x in [0, len(inputs[0])]]
-        self.set_oligo_rc(inputs[0], oligo1_start)
-        oligo2_start = [x + self.seq_offset for x in [self.n-len(inputs[1]), self.n]]
-        self.set_oligo_rc(inputs[1], oligo2_start)
-        self.pmut = 0.3
-        self.pexpand = 0.5
-        self.pshift = 0.5
+        current = 0
+        for input in inputs:
+            position = self.find_unconstrained_section(len(input), current) 
+            if not position: break
+            current = position[1]
+            self.set_oligo_rc(input, position)
+
+    def find_unconstrained_section(self, l, n):
+        """
+        get next unconstrained section of length l after position n
+        """
+        pos = self.seq_locks.find('o'*l, n)
+        if pos == -1:
+            return False
+        return [pos, pos+l]
 
     def set_oligo_rc(self, seq, range):
         """
@@ -202,8 +210,8 @@ class SequenceGraph(object):
 
     def get_rand_shift(self):
         # randomly choose an oligo and whether to shift
-        roligo = random.getrandbits(1)
-        shift = random.random() < self.pshift
+        roligo = random.randint(0, len(self.oligo_rc)-1)
+        shift = random.random() < 0.5
         min_index = min(list(itertools.chain(*self.index_array)))
         max_index = max(list(itertools.chain(*self.index_array)))
 
@@ -217,7 +225,7 @@ class SequenceGraph(object):
             elif self.oligo_len[roligo][1]-self.oligo_len[roligo][0] >= len(self.oligo_rc[roligo])-1:
                 expand = 0
             else:
-                expand = random.random() < self.pexpand
+                expand = random.random() < 0.5
 
 
         # choose left or right
@@ -242,8 +250,8 @@ class SequenceGraph(object):
         """
         either mutate sequence or shift the complement to the oligo in the design sequence
         """
-        # mutate randomly wp 0.5, otherwise mutate oligo rc
-        if (random.random() < self.pmut): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
+        # mutate randomly wp 0.3, otherwise mutate oligo rc
+        if (random.random() < 0.3): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
             return self.mutate_sequence()
 
         mut_array = list(self.sequence)
