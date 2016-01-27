@@ -102,12 +102,11 @@ class DesignSequence(object):
 
         self.update_sequence(sequence, oligo_conc)
 
-    def get_bpp_score(self, bpps):
+    def get_design_score(self):
         """
         calculates design score using scoring function
         """
-        score = self.scoring_func(bpps)
-        return score
+        return self.scoring_func(self)
     
     def score_secstructs(self, sequence, secstruct, energies):
         """
@@ -177,8 +176,8 @@ class DesignSequence(object):
             self.native = [[x[0], x[2]] for x in result]
             self.energies = [x[1] for x in result]
             self.bpps = [x[3] for x in result]
-        self.design_score = max(self.get_bpp_score(self.bpps),0)
         self.bp_distance = self.score_secstructs(sequence, self.native, self.energies)
+        self.design_score = max(self.get_design_score(),0)
         return
     
     def is_solution(self):
