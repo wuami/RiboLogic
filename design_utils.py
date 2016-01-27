@@ -91,7 +91,8 @@ class bpScorer():
                     pair_list.append(i)
             self.indices.append(pair_list)
 
-    def score(self, dotplots):
+    def score(self, seq):
+        dotplots = seq.bpps
         score = 0.0
         for i, dotplot in enumerate(dotplots):
             n = self.n[i]
