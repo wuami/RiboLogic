@@ -28,9 +28,9 @@ def vienna_fold(sequence, constraint=False, bpp=False):
         if sequence.count('&') > 1:
             print 'Cannot handle more than 2 strands with Vienna - try the nupack option'
             sys.exit()
-        command = 'RNAcofold'
+        command = 'RNAcofold' + settings.vienna_version
     else:
-        command = 'RNAfold'
+        command = 'RNAfold' + settings.vienna_version
     output = subprocess.check_output(os.path.join(settings.VIENNA_DIR,command) + options + ' -T 37.0 < %s' % filename + '.fa', shell=True)
 
     # parse the result

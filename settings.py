@@ -13,6 +13,8 @@ else:
     print "%s platform not supported"
     sys.exit()
 
+vienna_version = "2"
+
 RESOURCE_DIR = os.path.join(base_dir, 'resources')
 STRATEGY_DIR = os.path.join(base_dir, 'strategies')
 VIENNA_DIR = os.path.join(RESOURCE_DIR, 'vienna', os_dir)
