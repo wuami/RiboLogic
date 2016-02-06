@@ -6,17 +6,17 @@ base_dir = '/'.join(spl[:-1])
 
 pf = platform.system()
 if pf == 'Linux':
-    os_dir = 'linux'
+    os_ = 'linux'
 elif pf == 'Darwin':
-    os_dir = 'osx'
+    os_ = 'osx'
 else:
     print "%s platform not supported"
     sys.exit()
 
-vienna_version = "2"
+vienna_version = "2.1.9"
 
 RESOURCE_DIR = os.path.join(base_dir, 'resources')
 STRATEGY_DIR = os.path.join(base_dir, 'strategies')
-VIENNA_DIR = os.path.join(RESOURCE_DIR, 'vienna', os_dir)
-NUPACK_DIR = os.path.join(RESOURCE_DIR, 'nupack', os_dir)
+VIENNA_DIR = os.path.join(RESOURCE_DIR, 'vienna', os_)
+NUPACK_DIR = os.path.join(RESOURCE_DIR, 'nupack', os_)
 

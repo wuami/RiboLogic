@@ -1,7 +1,7 @@
 import subprocess, os, sys, settings
 import re, string, random, itertools
 
-def vienna_fold(sequence, constraint=False, bpp=False):
+def vienna_fold(sequence, constraint=False, bpp=False, version=settings.vienna_version):
     """
     folds sequence using Vienna
 
@@ -11,6 +11,16 @@ def vienna_fold(sequence, constraint=False, bpp=False):
     returns:
     secondary structure
     """
+    if version in ['1.8.5', '1.8', '1']:
+        if settings.os_ == 'osx':
+            print 'Vienna version 1.8.5 not supported on OSX'
+            sys.exit()
+        version = '1'
+    elif version in ['2.1.9', '2.1', '2']:
+        version = '2'
+    else:
+        print 'Vienna version must be 1.8.5 or 2.1.9'
+        sys.exit()
     filename = ''.join(random.sample(string.lowercase,5))
     with open(filename+'.fa','w') as f:
         f.write('>%s\n' % filename)
@@ -23,14 +33,17 @@ def vienna_fold(sequence, constraint=False, bpp=False):
     if bpp:
         options += ' -p'
     else:
-        options += ' --noPS'
+        if version == '1':
+            options += ' -noPS'
+        else:
+            options += ' --noPS'
     if '&' in sequence:
         if sequence.count('&') > 1:
             print 'Cannot handle more than 2 strands with Vienna - try the nupack option'
             sys.exit()
-        command = 'RNAcofold' + settings.vienna_version
+        command = 'RNAcofold' + version
     else:
-        command = 'RNAfold' + settings.vienna_version
+        command = 'RNAfold' + version
     output = subprocess.check_output(os.path.join(settings.VIENNA_DIR,command) + options + ' -T 37.0 < %s' % filename + '.fa', shell=True)
 
     # parse the result
@@ -149,5 +162,5 @@ def nupack_fold(seq, oligo_conc, bpp=False):
         os.system('rm %s*' % rand_string)
         return [secstruct.replace('+', '&'), float(energy), strands, bpp_matrix]
 
-    os.system('rm %s*' % rand_string)
+    #os.system('rm %s*' % rand_string)
     return [secstruct.replace('+', '&'), float(energy), strands]
