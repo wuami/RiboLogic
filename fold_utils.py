@@ -86,11 +86,56 @@ def get_orderings(n):
                 all.append(order_list)
     return all
 
-def nupack_fold(seq, oligo_conc, bpp=False):
+def nupack_fold(seq, constraint=False, oligo_conc=1, bpp=False):
     """
     finds most prevalent structure using nupack partition function
     """
-    os.system('source ~/.bashrc')
+    if '&' in seq:
+        return nupack_fold_multi(seq, constraint, oligo_conc, bpp)
+    else:
+        return nupack_fold_single(seq, constraint, bpp)
+
+def nupack_fold_single(seq, constraint=False, bpp=False):
+    """
+    finds most prevalent structure using nupack partition function for single strand
+    """
+    rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
+    options = ['-material', 'rna']
+    with open('%s.in' % rand_string, 'w') as f:
+        f.write('%s\n' % seq)
+        if constraint:
+            f.write('%s\n' % constraint)
+            options.append('-constraint')
+    p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'mfe_mod')] + options + [rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    p.wait()
+    result = ['.'*len(seq), [1], 0]
+    with open('%s.mfe' % rand_string) as f:
+        line = f.readline()
+        while line:
+            if not line.startswith('%') and line.strip():
+                energy = float(f.readline().strip())
+                secstruct = f.readline().strip()
+                result = [secstruct, [1], energy]
+                break
+            line = f.readline()
+    if bpp:
+        p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'pairs_mod')] + options + [rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        p.wait()
+        bpp_matrix = []
+        with open('%s.ppairs' % rand_string) as f:
+            line = f.readline()
+            while line:
+                if not line.startswith('%') and line.strip():
+                    bpp_matrix = nupack_read_bpp(f)
+                line = f.readline()
+        result.append(bpp_matrix)
+    #os.system('rm %s*' % rand_string)
+    return result
+
+def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
+    """
+    finds most prevalent structure using nupack partition function for multistrand
+    """
     rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
     split = seq.split('&')
     with open('%s.in' % rand_string, 'w') as f:
@@ -98,6 +143,11 @@ def nupack_fold(seq, oligo_conc, bpp=False):
         for seq in split:
             f.write('%s\n' % seq)
         f.write('1\n')
+        if constraint:
+            for i in range(len(split)-1):
+                print len(split[i])
+                f.write('%s\n' % ('.'*len(split[i])))
+            f.write(constraint)
     orderings = get_orderings(len(split))
     with open('%s.list' % rand_string, 'w') as f:
         for ordering in orderings:
@@ -111,17 +161,25 @@ def nupack_fold(seq, oligo_conc, bpp=False):
     options = ['-material', 'rna', '-ordered', '-mfe']#, '-quiet']
     if bpp:
         options.append('-pairs')
-    p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'complexes')] + options + [rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    if constraint:
+        options.append('-constraint')
+    p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'complexes_mod')] + options + [rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     p.wait()
     p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'concentrations'), '-ordered', rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     p.wait()
     # get mfe
+    complex = False
     with open('%s.eq' % rand_string) as f_eq:
         for line in f_eq:
             if not line.startswith('%'):
                 complex = line.strip().split()
                 if int(complex[len(split)+1]):
                     break
+    if not complex:
+        os.system('rm %s*' % rand_string)
+        if bpp:
+            return ['.'*len(seq), 0, range(1,len(split)+1), []]
+        return ['.'*len(seq), 0, range(1,len(split)+1)]
     # get strand ordering
     with open('%s.ocx-key' % rand_string) as f_key:
         for line in f_key:
@@ -151,16 +209,49 @@ def nupack_fold(seq, oligo_conc, bpp=False):
             line = f_pairs.readline()
             while line:
                 if line.startswith('%% complex%s' % complex[0]):
-                    f_pairs.readline()
-                    line = f_pairs.readline()
-                    while not line.startswith('%'):
-                        bp = line.strip().split()
-                        bpp_matrix.append([int(bp[0]), int(bp[1]), float(bp[2])])
-                        line = f_pairs.readline()
+                    bpp_matrix = nupack_read_bpp(f_pairs)
                     break
                 line = f_pairs.readline()
         os.system('rm %s*' % rand_string)
         return [secstruct.replace('+', '&'), float(energy), strands, bpp_matrix]
 
-    #os.system('rm %s*' % rand_string)
+    os.system('rm %s*' % rand_string)
     return [secstruct.replace('+', '&'), float(energy), strands]
+
+def nupack_read_bpp(file):
+    """
+    read a base pair probability matrix from a nupack output file
+    """
+    bpp_matrix = []
+    file.readline()
+    line = file.readline()
+    while line and not line.startswith('%'):
+        bp = line.strip().split()
+        bpp_matrix.append([int(bp[0]), int(bp[1]), float(bp[2])])
+        line = file.readline()
+    return bpp_matrix
+
+
+def nupack_energy(seq, secstruct):
+    rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
+    multi = '&' in seq
+    split = seq.split('&')
+    with open('%s.in' % rand_string, 'w') as f:
+        if multi:
+            f.write('%s\n' % len(split))
+        for seq in split:
+            f.write('%s\n' % seq)
+        if multi:
+            f.write('%s\n' % ' '.join([str(i) for i in secstruct[1]]))
+            f.write(secstruct[0].replace('&', '+'))
+        else:
+            f.write(secstruct.replace('&', '+'))
+    if '&' in seq:
+        options = ['multi']
+    else:
+        options = []
+    result = subprocess.check_output([os.path.join(settings.NUPACK_DIR,'energy')] + options + [rand_string])
+    os.system('rm %s*' % rand_string)
+    return float(result.strip().split('\n')[-1])
+
+

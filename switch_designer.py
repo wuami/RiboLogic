@@ -67,13 +67,7 @@ class Design(object):
         multi_oligos = False
         if any([len(target['inputs']) > 1 for target in self.targets if 'inputs' in target]):
             multi_oligos = True
-        if aptamer and multi_oligos:
-            print 'Unable to handle aptamers and multiple RNA inputs simultaneously'
-            sys.exit()
-        elif aptamer:
-            print 'Switching to Vienna to handle aptamer'
-            self.default_mode = 'vienna'
-        elif multi_oligos:
+        if multi_oligos:
             print 'Switching to NUPACK to handle multiple RNA inputs'
             self.default_mode = 'nupack'
         else:
@@ -164,11 +158,20 @@ class DesignSequence(object):
                 self.energies.append(fold_list[1])
                 self.bpps.append(fold_list[2])
             if self.mode == 'nupack':
-                #if self.targets[i]['type'] == 'oligos' and isinstance(self.targets[i]['inputs'], dict):
-                concentrations = [target['inputs'][input]*oligo_conc for input in sorted(target['inputs'])]
-                result[i] = p.apply_async(fold_utils.nupack_fold, args=(self.fold_sequences[i], concentrations, True))
-                #else:
-                #    result[i] = p.apply_async(fold_utils.nupack_fold, args=(fold_sequence, self.target_oligo_conc*self.oligo_conc, True))
+                if 'inputs' in target:
+                    concentrations = [target['inputs'][input]*oligo_conc for input in sorted(target['inputs'])]
+                else:
+                    concentrations = 1
+                if target['type'] == 'aptamer':
+                    ligand = self.design.inputs[target['inputs'].keys()[0]]
+                    result[i] = p.apply_async(fold_utils.nupack_fold,
+                                              args=(self.fold_sequences[i],
+                                                    ligand['fold_constraint'],
+                                                    concentrations, True))
+                else:
+                    result[i] = p.apply_async(fold_utils.nupack_fold,
+                                              args=(self.fold_sequences[i], False,
+                                               concentrations, True))
         if self.mode == 'nupack':
             p.close()
             p.join()

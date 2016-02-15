@@ -125,7 +125,7 @@ def optimize_n(design, niter, ncool, n, **kwargs):
                 attempts = 0
         else:
             #niter += 500
-            print 'best distance: %s' % design.best_bp_distance
+            print 'best distance: %s' % design.best_design.bp_distance
             print 'final conc: %s' % design.oligo_conc
             attempts += 1
             if attempts == 10:
@@ -156,7 +156,7 @@ def optimize_timed(design, niter, ncool, time, **kwargs):
                 niters.append(n)
                 i += 1
             else:
-                print 'best distance: %s' % design.best_bp_distance
+                print 'best distance: %s' % design.best_design.bp_distance
                 print 'final conc: %s' % design.oligo_conc
             print '%s sequence(s) calculated' % i
     except Exception, exc:
