@@ -108,14 +108,14 @@ def nupack_fold_single(seq, constraint=False, bpp=False):
             options.append('-constraint')
     p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'mfe_mod')] + options + [rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     p.wait()
-    result = ['.'*len(seq), [1], 0]
+    result = ['.'*len(seq), 0, [1]]
     with open('%s.mfe' % rand_string) as f:
         line = f.readline()
         while line:
             if not line.startswith('%') and line.strip():
                 energy = float(f.readline().strip())
                 secstruct = f.readline().strip()
-                result = [secstruct, [1], energy]
+                result = [secstruct, energy, [1]]
                 break
             line = f.readline()
     if bpp:

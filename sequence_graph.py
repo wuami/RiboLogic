@@ -59,8 +59,8 @@ class SequenceGraph(object):
         seq_array = list(self.sequence)
         if self.autocomplement:
             for i in range(self.N):
-                if self.seq_locks[i] == 'x':
-                    self.update_neighbors(i, seq_array, [])
+                #if self.seq_locks[i] == 'x':
+                self.update_neighbors(i, seq_array, [])
         self.sequence = ''.join(seq_array)
         if self.add_rcs:
             self.init_oligo_rcs()
