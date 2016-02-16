@@ -90,10 +90,15 @@ def nupack_fold(seq, constraint=False, oligo_conc=1, bpp=False):
     """
     finds most prevalent structure using nupack partition function
     """
-    if '&' in seq:
-        return nupack_fold_multi(seq, constraint, oligo_conc, bpp)
-    else:
-        return nupack_fold_single(seq, constraint, bpp)
+    try:
+        if '&' in seq:
+            return nupack_fold_multi(seq, constraint, oligo_conc, bpp)
+        else:
+            return nupack_fold_single(seq, constraint, bpp)
+    except:
+        if bpp:
+            return ['.'*len(seq), 0, [1], []]
+        return ['.'*len(seq), 0, [1]]
 
 def nupack_fold_single(seq, constraint=False, bpp=False):
     """
@@ -107,7 +112,9 @@ def nupack_fold_single(seq, constraint=False, bpp=False):
             f.write('%s\n' % constraint)
             options.append('-constraint')
     p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'mfe_mod')] + options + [rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-    p.wait()
+    rcode = p.wait()
+    if rcode != 0:
+        raise ValueError('mfe_mod command failed for %s' % rand_string)
     result = ['.'*len(seq), 0, [1]]
     with open('%s.mfe' % rand_string) as f:
         line = f.readline()
@@ -120,8 +127,10 @@ def nupack_fold_single(seq, constraint=False, bpp=False):
             line = f.readline()
     if bpp:
         p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'pairs_mod')] + options + [rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-        p.wait()
+        rcode = p.wait()
         bpp_matrix = []
+        if rcode != 0:
+            raise ValueError('mfe_mod command failed for %s' % rand_string)
         with open('%s.ppairs' % rand_string) as f:
             line = f.readline()
             while line:
@@ -129,7 +138,7 @@ def nupack_fold_single(seq, constraint=False, bpp=False):
                     bpp_matrix = nupack_read_bpp(f)
                 line = f.readline()
         result.append(bpp_matrix)
-    #os.system('rm %s*' % rand_string)
+    os.system('rm %s*' % rand_string)
     return result
 
 def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
@@ -164,9 +173,13 @@ def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
     if constraint:
         options.append('-constraint')
     p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'complexes_mod')] + options + [rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-    p.wait()
+    rcode = p.wait()
+    if rcode != 0:
+        raise ValueError('complexes_mod command failed for %s' % rand_string)
     p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'concentrations'), '-ordered', rand_string], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
-    p.wait()
+    rcode = p.wait()
+    if rcode != 0:
+        raise ValueError('concentrations command failed for %s' % rand_string)
     # get mfe
     complex = False
     with open('%s.eq' % rand_string) as f_eq:
