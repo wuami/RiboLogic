@@ -88,7 +88,7 @@ class Design(object):
 
 class DesignSequence(object):
 
-    def __init__(self, design, sequence, mode = 'nupack', oligo_conc = None):
+    def __init__(self, design, sequence, mode = 'nupack', oligo_conc = 1):
         self.design = design
         self.n_targets = len(design.targets)
         self.mode = design.default_mode if design.default_mode else mode
@@ -137,7 +137,7 @@ class DesignSequence(object):
 
         return distance
 
-    def update_sequence(self, sequence, oligo_conc=None):
+    def update_sequence(self, sequence, oligo_conc=1):
         self.sequence = sequence
         self.native = [] 
         self.energies = []
@@ -159,6 +159,7 @@ class DesignSequence(object):
                 self.bpps.append(fold_list[2])
             if self.mode == 'nupack':
                 if 'inputs' in target:
+                    print target['inputs']
                     concentrations = [target['inputs'][input]*oligo_conc for input in sorted(target['inputs'])]
                 else:
                     concentrations = 1
