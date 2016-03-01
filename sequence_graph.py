@@ -23,6 +23,7 @@ class SequenceGraph(object):
         self.sequence = self._get_full_sequence(design.begin_seq)
         self.n = len(self.design_seq)
         self.N = len(self.sequence)
+        self.seq_offset = self.N - self.n
 
         # get options
         self.add_rcs = kwargs.get('add_rcs', False)
@@ -140,7 +141,6 @@ class SequenceGraph(object):
         get dependency graph based on target secondary structures
         """
         # position of start of actual sequence in graph
-        self.seq_offset = sum([len(x['sequence']) for x in self.inputs.values()]) + len(self.inputs)
 
         # create graph
         graph = nx.Graph()
@@ -187,19 +187,19 @@ class SequenceGraph(object):
         get indices for positions that can change
         """
         open = []
-        restricted = []
-        for ii in range(0,self.N):
-            if(self.seq_locks[ii] == 'o'):
+        #restricted = []
+        for ii in range(self.n):
+            if(self.seq_locks[ii + self.seq_offset] == 'o'):
                 open.append(ii)
-            elif self.seq_locks[ii] == 'r':
-                restricted.append(ii)
-        return [open, restricted]
+            #elif self.seq_locks[ii] == 'r':
+            #    restricted.append(ii)
+        return open#[open, restricted]
 
-    def mutate(self):
+    def mutate(self, mispaired_positions):
         """
         general mutate function
         """
-        self.sequence = self.mutate_func()
+        self.sequence = self.mutate_func(mispaired_positions)
         if self.draw:
             if self.printi <= 20:
                 ## draw dependency graph, for debugging
@@ -212,8 +212,10 @@ class SequenceGraph(object):
         # randomly choose an oligo and whether to shift
         roligo = random.randint(0, len(self.oligo_rc)-1)
         shift = random.random() < 0.5
-        min_index = min(list(itertools.chain(*self.index_array)))
-        max_index = max(list(itertools.chain(*self.index_array)))
+        #min_index = min(list(itertools.chain(*self.index_array)))
+        #max_index = max(list(itertools.chain(*self.index_array)))
+        min_index = min(self.index_array)
+        max_index = max(self.index_array)
 
         # choose to expand or shrink rc sequence
         maxed_out = False
@@ -246,13 +248,13 @@ class SequenceGraph(object):
         
         return roligo, shift, expand, right
 
-    def mutate_or_shift(self):
+    def mutate_or_shift(self, mispaired_positions):
         """
         either mutate sequence or shift the complement to the oligo in the design sequence
         """
         # mutate randomly wp 0.3, otherwise mutate oligo rc
-        if (random.random() < 0.3): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
-            return self.mutate_sequence()
+        if (random.random() < 0.3 or not self.oligo_rc): #float(self.oligo_len_sum)/sum([len(x) for x in self.index_array])):
+            return self.mutate_sequence(mispaired_positions)
 
         mut_array = list(self.sequence)
         roligo, shift, expand, right = self.get_rand_shift()
@@ -295,14 +297,16 @@ class SequenceGraph(object):
         self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
         return ''.join(mut_array)
 
-    def mutate_sequence(self):
+    def mutate_sequence(self, mispaired_positions):
         """ mutate one random position """
         while True:
             mut_array = list(self.sequence)
-            if random.random() < 0.9 or len(self.index_array[1]) == 0 and len(self.index_array[0]) != 0:
-                rindex = self.index_array[0][int(random.random() * len(self.index_array[0]))]
-            else:
-                rindex = self.index_array[1][int(random.random() * len(self.index_array[1]))]
+            weights = [1 if i in mispaired_positions else 0.5 for i in self.index_array]
+            rindex = design_utils.weighted_choice(self.index_array, weights) + self.seq_offset
+            #if random.random() < 0.9 or len(self.index_array[1]) == 0 and len(self.index_array[0]) != 0:
+            #    rindex = self.index_array[0][int(random.random() * len(self.index_array[0]))]
+            #else:
+            #    rindex = self.index_array[1][int(random.random() * len(self.index_array[1]))]
             rbase = design_utils.get_random_base(self.dep_graph.node[rindex]['bases'])
             mut_array[rindex] = rbase
             if self.autocomplement:

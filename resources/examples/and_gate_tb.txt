@@ -26,3 +26,7 @@ oooooooooooooooooooooooooooooooooooooooxxxxxxxxxxxxxxxxxxxoooooooooooooooooooooo
 oligoA 1e-7; oligoB 1e-7
 .......................................(((((.((....)))))))...........................
 oooooooooooooooooooooooooooooooooooooooxxxxxxxxxxxxxxxxxxxooooooooooooooooooooooooooo
+
+xGGGG
+xCCCC
+xAAAAA

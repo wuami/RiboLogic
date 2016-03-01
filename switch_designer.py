@@ -114,11 +114,18 @@ class DesignSequence(object):
         distance = 0.0
         strands_interacting = 0.0
         n_strands = 0.0
+        self.mispaired_positions = set()
         for i, target in enumerate(self.design.targets):
             if 'threshold' in target:
-                distance += design_utils.bp_distance(secstruct[i], target['secstruct'], target['constrained'], target['threshold'])
+                bp_result = design_utils.bp_distance(secstruct[i], target['secstruct'], target['constrained'], target['threshold'])
+                distance += bp_result[0]
+                offset = len(target['secstruct']) - len(sequence)
+                self.mispaired_positions.update(set([j - offset for j in bp_result[1] if j >= offset]))
             else:
-                distance += design_utils.bp_distance(secstruct[i], target['secstruct'], target['constrained'])
+                bp_result = design_utils.bp_distance(secstruct[i], target['secstruct'], target['constrained'])
+                distance += bp_result[0]
+                offset = len(target['secstruct']) - len(sequence)
+                self.mispaired_positions.update(set([j - offset for j in bp_result[1] if j >= offset]))
             if target['type'] == 'aptamer':
                 energy_compare[target['type']] = energies[i]
                 ligand = target['inputs'].keys()[0]
@@ -159,7 +166,6 @@ class DesignSequence(object):
                 self.bpps.append(fold_list[2])
             if self.mode == 'nupack':
                 if 'inputs' in target:
-                    print target['inputs']
                     concentrations = [target['inputs'][input]*oligo_conc for input in sorted(target['inputs'])]
                 else:
                     concentrations = 1
@@ -294,7 +300,7 @@ class SwitchDesigner(object):
             #random.shuffle(index_array)
             
             # pick random nucleotide in sequence
-            mut_sequence = self.sequence_graph.mutate()
+            mut_sequence = self.sequence_graph.mutate(self.current_design.mispaired_positions)
             mut_design = DesignSequence(self.design, mut_sequence, self.mode, self.oligo_conc)
 
             # if distance or score is better for mutant, update the current sequence

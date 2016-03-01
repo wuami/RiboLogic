@@ -41,6 +41,7 @@ def bp_distance(secstruct1, secstruct2, locks, threshold=0):
     dist = 0
     match = 0
     j = 0
+    nonmatching = []
     for i in range(0,len(locks)):
         if(locks[i] == 'u'):
             if(secstruct1[i] == secstruct2[i]):
@@ -52,11 +53,14 @@ def bp_distance(secstruct1, secstruct2, locks, threshold=0):
             if(pairmap1[i] != pairmap2[i]):
                 if(pairmap1[i] > i):
                     dist += 1
+                    nonmatching.append(i)
                 if(pairmap2[i] > i):
                     dist += 1
+                    nonmatching.append(i)
         elif locks[i] == 'n':
             if(pairmap1[i] == pairmap2[i]):
                 dist += 1
+                nonmatching.append(i)
         else:
             continue
         if i == threshold[j][1]:
@@ -64,7 +68,7 @@ def bp_distance(secstruct1, secstruct2, locks, threshold=0):
             udist = 0
             if j != len(threshold)-1:
                 j += 1
-    return dist
+    return dist, nonmatching
 
 class bpScorer():
     """
@@ -256,3 +260,11 @@ def satisfies_constraints(sequence, beginseq, constraints):
         if beginseq[i] != sequence[i]:
             return False
     return True
+
+def weighted_choice(seq, w):
+    r = random.uniform(0, sum(w))
+    current = 0
+    for i, choice in enumerate(seq):
+        if current + w[i] >= r:
+            return choice
+        current += w[i]

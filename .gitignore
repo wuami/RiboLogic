@@ -65,3 +65,4 @@ target/
 *.json
 *.out
 *.sh.*
+*.swp
