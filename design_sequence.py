@@ -91,7 +91,10 @@ def read_design_from_file(filename, **kwargs):
     for seq, pos in variables.items():
         l = len(seq)
         positions = [p for p in pos if set(range(p,p+l)).issubset(free_positions)]
-        r = random.choice(positions)
+        if 'rpos' in kwargs:
+            r = kwargs['rpos']
+        else:
+            r = random.choice(positions)
         beginseq = insert_in_string(beginseq, seq, r)
         seq_locks = insert_in_string(seq_locks, 'x'*l, r)
         for target in targets:
@@ -184,7 +187,7 @@ def main():
     args = p.parse_args()
 
     # read design
-    design = read_design_from_file(args.filename, mode=args.mode, add_rcs=args.add_rcs, print_=args.print_)
+    design = read_design_from_file(args.filename)
     if design.default_mode:
         args.mode = design.default_mode
     designer =  switch_designer.SwitchDesigner(os.path.basename(args.filename).split('.')[0], design, **vars(args))

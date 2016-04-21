@@ -211,14 +211,21 @@ class SequenceGraph(object):
     def get_rand_shift(self):
         # randomly choose an oligo and whether to shift
         roligo = random.randint(0, len(self.oligo_rc)-1)
-        shift = random.random() < 0.5
-        #min_index = min(list(itertools.chain(*self.index_array)))
-        #max_index = max(list(itertools.chain(*self.index_array)))
         min_index = min(self.index_array)
         max_index = max(self.index_array)
+    
+        # choose whether or not to shift
+        if self.seq_locks[self.oligo_pos[roligo][1]] == 'x' and \
+           self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
+            shift = 0
+        elif self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
+            return roligo, 1, 0, 1
+        elif self.seq_locks[self.oligo_pos[roligo][1]] == 'x':
+            return roligo, 1, 0, 0
+        else:
+            shift = random.random() < 0.5
 
         # choose to expand or shrink rc sequence
-        maxed_out = False
         if shift:
             expand = 0
         else:
@@ -229,17 +236,15 @@ class SequenceGraph(object):
             else:
                 expand = random.random() < 0.5
 
-
         # choose left or right
+        maxed_out = False
         if expand or shift:
-            if self.oligo_pos[roligo][1] >= self.N or self.oligo_pos[roligo][1] >= max_index or \
-               (self.oligo_len[roligo][1] >= len(self.oligo_rc[roligo])-1 and expand) or \
-               self.seq_locks[self.oligo_pos[roligo][1]-1] == 'x':
+            if self.oligo_pos[roligo][1] >= max_index or \
+               (self.oligo_len[roligo][1] >= len(self.oligo_rc[roligo])-1 and expand):
                 right = 0
                 maxed_out = True
-            if self.oligo_pos[roligo][0] <= 0 or self.oligo_pos[roligo][0] <= min_index or \
-               (self.oligo_len[roligo][0] <= 0 and expand) or \
-               self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
+            if self.oligo_pos[roligo][0] <= min_index or \
+               (self.oligo_len[roligo][0] <= 0 and expand):
                 right = 1
                 if maxed_out:
                     expand = 0
@@ -270,7 +275,7 @@ class SequenceGraph(object):
             start, end = self.oligo_pos[roligo]
             lo, hi = self.oligo_len[roligo]
             new_seq = seq[:start] + self.oligo_rc[roligo][lo:hi+1] + seq[end:]
-            assert len(seq) == len(new_seq), 'shifted sequence changed lengths'
+            assert len(seq) == len(new_seq), 'shifted sequence changed lengths\nlo %d, hi %d, start %d, end %d' % (lo, hi, start, end)
             return new_seq
         # expand complement sequence
         if expand:
@@ -295,6 +300,9 @@ class SequenceGraph(object):
                 self.oligo_pos[roligo][0] += 1
                 self.oligo_len[roligo][0] += 1 
         self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
+        assert self.oligo_len[roligo][1] > self.oligo_len[roligo][0], 'disallowed move: expand %d, right %d' % (expand, right) + \
+                                                                      'oligo start %d, oligo end %d' % (self.oligo_len[roligo][0], self.oligo_len[roligo][1]) + \
+                                                                      'pos start %d, pos end %d' % (self.oligo_pos[roligo][0], self.oligo_pos[roligo][1])
         return ''.join(mut_array)
 
     def mutate_sequence(self, mispaired_positions):

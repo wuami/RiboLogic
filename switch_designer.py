@@ -194,7 +194,9 @@ class DesignSequence(object):
         return self.score_secstructs(self.sequence, self.native, self.energies) == 0 and self.oligo_conc == 1
 
     def print_(self):
-        print self.sequence, self.bp_distance, self.design_score
+        print self.sequence
+        print 'bp distance: %d' % self.bp_distance
+        print 'design score: %f' % self.design_score
         print 'conc: %s' % self.oligo_conc
         for j in range(self.n_targets):
             print self.native[j]
@@ -321,6 +323,7 @@ class SwitchDesigner(object):
 
             if self.best_design.bp_distance == 0 and self.oligo_conc == 1.0:
                 print '-> Reached solution in %d iterations.' % i
+                self.best_design.print_()
                 if not continue_opt:
                     return i
 
