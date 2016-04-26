@@ -215,13 +215,13 @@ class SequenceGraph(object):
         max_index = max(self.index_array)
     
         # choose whether or not to shift
-        if self.seq_locks[self.oligo_pos[roligo][1]] == 'x' and \
-           self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
+        if (self.oligo_pos[roligo][1] == len(self.oligo_rc[roligo])-1 or self.seq_locks[self.oligo_pos[roligo][1]] == 'x') and \
+           (self.oligo_pos[roligo][0] == 0 or self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x'):
             shift = 0
-        elif self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
-            return roligo, 1, 0, 1
-        elif self.seq_locks[self.oligo_pos[roligo][1]] == 'x':
-            return roligo, 1, 0, 0
+        #elif self.seq_locks[self.oligo_pos[roligo][0]-1] == 'x':
+        #    return roligo, 1, 0, 1
+        #elif self.seq_locks[self.oligo_pos[roligo][1]] == 'x':
+        #    return roligo, 1, 0, 0
         else:
             shift = random.random() < 0.5
 
@@ -248,6 +248,7 @@ class SequenceGraph(object):
                 right = 1
                 if maxed_out:
                     expand = 0
+                    shift = 1
         if 'right' not in locals():
             right = random.getrandbits(1)
         
@@ -300,9 +301,9 @@ class SequenceGraph(object):
                 self.oligo_pos[roligo][0] += 1
                 self.oligo_len[roligo][0] += 1 
         self.oligo_len_sum = sum([x[1]-x[0] for x in self.oligo_len])
-        assert self.oligo_len[roligo][1] > self.oligo_len[roligo][0], 'disallowed move: expand %d, right %d' % (expand, right) + \
-                                                                      'oligo start %d, oligo end %d' % (self.oligo_len[roligo][0], self.oligo_len[roligo][1]) + \
-                                                                      'pos start %d, pos end %d' % (self.oligo_pos[roligo][0], self.oligo_pos[roligo][1])
+        assert self.oligo_len[roligo][1] > self.oligo_len[roligo][0], 'disallowed move: shift %d, expand %d, right %d\n' % (shift, expand, right) + \
+                                                                      'oligo start %d, oligo end %d\n' % (self.oligo_len[roligo][0], self.oligo_len[roligo][1]) + \
+                                                                      'pos start %d, pos end %d\n' % (self.oligo_pos[roligo][0], self.oligo_pos[roligo][1])
         return ''.join(mut_array)
 
     def mutate_sequence(self, mispaired_positions):

@@ -1,0 +1,36 @@
+<oligoA
+ACCCCACAAUAAAGAAUAAG
+
+<oligoB
+CUGAUCCCAUCUCACUC
+
+-sequence
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+
+-variable
+ACAUGAGGAUCACCCAUGU
+
+>oligos
+oligoB 1e-7
+.....................................................................................
+ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+(((((.((....)))))))
+nnnnnonnoooonnnnnnn
+
+>oligos
+oligoA 5e-9; oligoB 5e-9
+.....................................................................................
+ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+(((((.((....)))))))
+xxxxxxxxxxxxxxxxxxx
+
+>oligos
+oligoA 5e-9; oligoB 1e-7
+.....................................................................................
+ooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+(((((.((....)))))))
+nnnnnonnoooonnnnnnn
+
+xGGGG
+xCCCC
+xAAAAA
