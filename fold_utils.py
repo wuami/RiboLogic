@@ -1,6 +1,8 @@
 import subprocess, os, sys, settings
 import re, string, random, itertools
 
+paramfile = 'rna1999'
+
 def vienna_fold(sequence, constraint=False, bpp=False, version=settings.vienna_version):
     """
     folds sequence using Vienna
@@ -106,7 +108,7 @@ def nupack_fold_single(seq, constraint=False, bpp=False):
     """
     rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
     filename = '%s/%s' % (settings.TEMP_DIR, rand_string)
-    options = ['-material', 'rna']
+    options = ['-material', paramfile]
     with open('%s.in' % filename, 'w') as f:
         f.write('%s\n' % seq)
         if constraint:
@@ -169,7 +171,7 @@ def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
         else:
             f.write('%s\n' % oligo_conc * (len(split)-1))
         f.write('1e-9\n')
-    options = ['-material', 'rna', '-ordered', '-mfe']#, '-quiet']
+    options = ['-material', paramfile, '-ordered', '-mfe']#, '-quiet']
     if bpp:
         options.append('-pairs')
     if constraint:

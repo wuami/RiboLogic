@@ -4,6 +4,10 @@ RiboLogic is a Python package for designing RNAs to adopt specified secondary st
 
 See `example_run.sh` for example usage.
 
-# Dependecies
+# Dependencies
 
-Python2.7+, Python packages: `matplotlib`, `requests`, `networkx`.
+Python2.7+, Python packages: `numpy`, `matplotlib`, `requests`, `networkx`.
+
+NUPACK
+- add the following to your bashrc
+`export NUPACKHOME=/path/to/RiboLogic/resources/nupack`
