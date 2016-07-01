@@ -10,7 +10,7 @@ AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
 >oligos
 oligo2 1e-7
 ||||||||||||||||||||&.....................................................................................
-xxxxxxxxxxxxxxxxxxxxoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+ppppppppppppppppppppoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
 5
 
 >oligos

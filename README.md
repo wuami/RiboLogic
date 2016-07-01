@@ -74,7 +74,7 @@ Secondary structure constraints, indicated by `>`, may be specified for various 
 can have one of the following types: single (no inputs), oligos (RNA inputs),
 and  aptamer (ligand inputs).  The constraints are specified by one line with
 the desired secondary structure and a second line that specifies the bases
-that should be constrained (`x` = constrained, `o` = unconstrained, `n` =
+that should be constrained (`x` = constrained, `o` = unconstrained, `p` = paired (to any other base), `n` =
 anything that is *not* what is given)
 
 ```
@@ -100,4 +100,13 @@ concentration.
 myligand 200e-6
 .....(((((.......))))))).
 ooooooonnnooooooonnnnnooo
+```
+
+For bases that need to be paired but not to a specific base, use `|`.  You can supply an optional threshold parameter on the line following the constraints.  In the following example, the design must have at least 5 paired bases in the indicated region.
+
+```
+>single
+.....||||||||............
+oooooppppppppoooooooooooo
+5
 ```
