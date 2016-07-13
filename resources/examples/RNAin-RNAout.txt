@@ -1,0 +1,19 @@
+<oligo1
+CUGAUCCCAUCUCACUC
+
+<oligo2
+ACCCCACAAUAAAGAAUAAG
+
+-sequence
+AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA
+
+>oligos
+oligo2 1e-7
+||||||||||||||||||||&.....................................................................................
+xxxxxxxxxxxxxxxxxxxxoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
+5
+
+>oligos
+oligo1 1e-7, oligo2 1e-7
+.................&....................&.....................................................................................
+ooooooooooooooooooxxxxxxxxxxxxxxxxxxxxoooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooooo
