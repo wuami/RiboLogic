@@ -90,7 +90,7 @@ class bpScorer():
                         stack.append(i)
                     elif target['secstruct'][i] == ')':
                         j = stack.pop()
-                        pair_list.append([i,j])
+                        pair_list.append([j,i])
                 elif target['constrained'][i] == 'p':
                     pair_list.append(i)
             self.indices.append(pair_list)

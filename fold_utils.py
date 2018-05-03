@@ -1,7 +1,7 @@
 import subprocess, os, sys, settings
 import re, string, random, itertools
 
-paramfile = 'rna1999'
+paramfile = 'rna'
 
 def vienna_fold(sequence, constraint=False, bpp=False, version=settings.vienna_version):
     """
@@ -243,7 +243,7 @@ def nupack_read_bpp(file):
     line = file.readline()
     while line and not line.startswith('%'):
         bp = line.strip().split()
-        bpp_matrix.append([int(bp[0]), int(bp[1]), float(bp[2])])
+        bpp_matrix.append([int(bp[0])-1, int(bp[1])-1, float(bp[2])])
         line = file.readline()
     return bpp_matrix
 
