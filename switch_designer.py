@@ -178,7 +178,7 @@ class DesignSequence(object):
                 else:
                     result[i] = p.apply_async(fold_utils.nupack_fold,
                                               args=(self.fold_sequences[i], False,
-                                               concentrations, True))
+                                                    concentrations, True))
         if self.mode == 'nupack':
             p.close()
             p.join()
@@ -261,7 +261,7 @@ class SwitchDesigner(object):
     def check_current(self):
         return self.best_design.is_solution()
 
-    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, print_ = None, start_oligo_conc=1e7, continue_opt=False):
+    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, print_ = None, start_oligo_conc=1e7, continue_=False):
         """
         monte-carlo optimization of the sequence
 
@@ -312,6 +312,7 @@ class SwitchDesigner(object):
                     continue
                 self.update_current(mut_design)
                 if self.print_:
+                    print i
                     self.current_design.print_()
                         #print self.get_fold_sequence(self.sequence, self.targets[j])
             
@@ -324,7 +325,7 @@ class SwitchDesigner(object):
             if self.best_design.bp_distance == 0 and self.oligo_conc == 1.0:
                 print '-> Reached solution in %d iterations.' % i
                 self.best_design.print_()
-                if not continue_opt:
+                if not continue_:
                     return i
 
             # decrease temperature

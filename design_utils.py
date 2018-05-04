@@ -83,7 +83,9 @@ class bpScorer():
         for target in targets:
             self.n.append(len(target['secstruct']))
             pair_list = []
+            unpair_list = []
             stack = []
+            unstack = []
             for i in range(len(target['secstruct'])):
                 if target['constrained'][i] == 'x':
                     if target['secstruct'][i] == '(':
@@ -93,24 +95,35 @@ class bpScorer():
                         pair_list.append([j,i])
                 elif target['constrained'][i] == 'p':
                     pair_list.append(i)
-            self.indices.append(pair_list)
+                elif target['constrained'][i] == 'n':
+                    if target['secstruct'][i] == '(':
+                        unstack.append(i)
+                    elif target['secstruct'][i] == ')':
+                        j = unstack.pop()
+                        unpair_list.append([j,i])
+            self.indices.append([pair_list, unpair_list])
 
     def score(self, seq):
         dotplots = seq.bpps
-        score = 0.0
+        score = []
         for i, dotplot in enumerate(dotplots):
             n = self.n[i]
-            pair_list = self.indices[i]
+            pair_list, unpair_list = self.indices[i]
             for item in pair_list:
                 if isinstance(item, list):
                     values = [pair[2] for pair in dotplot if set(pair[0:2]) == set(item[0:2])]
                     if len(values) != 0:
-                        score += sum(values)
+                        score.append(sum(values))
                 else:
                     values = [pair[2] for pair in dotplot if (item in pair and n not in pair)]
                     if len(values) != 0:
-                        score += sum(values)
-        return score
+                        score.append(sum(values))
+            for item in unpair_list:
+                values = [pair[2] for pair in dotplot if set(pair[0:2]) == set(item[0:2])]
+                if len(values) != 0:
+                    score.append(-sum(values))
+        print score
+        return sum(score)
             
 def get_bpp_scoring_func(targets, nupack): 
     """

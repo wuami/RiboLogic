@@ -110,7 +110,7 @@ def optimize_n(design, niter, ncool, n, **kwargs):
     attempts = 0
     while i < n:
         design.reset_sequence()
-        passkwargs = {key:kwargs[key] for key in ['greedy', 'start_oligo_conc']}
+        passkwargs = {key:kwargs[key] for key in ['greedy', 'start_oligo_conc', 'continue_']}
         nfin = design.optimize_sequence(niter, ncool, **passkwargs)
         if design.check_current():
             sol = design.get_solution()
@@ -150,7 +150,7 @@ def optimize_timed(design, niter, ncool, time, **kwargs):
     try:
         while True:
             design.reset_sequence()
-            passkwargs = {key:kwargs[key] for key in ['greedy', 'start_oligo_conc']}
+            passkwargs = {key:kwargs[key] for key in ['greedy', 'start_oligo_conc', 'continue_']}
             n = design.optimize_sequence(niter, ncool, **passkwargs)
             if design.check_current():
                 sol = design.get_solution()
@@ -181,6 +181,7 @@ def main():
     p.add_argument('-m', '--mode', help='mode for multi inputs', type=str, default='nupack')
     p.add_argument('-c', '--conc', help='starting oligo concentration', type=float, default=1)
     p.add_argument('--nowrite', help='suppress write to file', default=False, action='store_true')
+    p.add_argument('--cont', help='continue optimization after a solution is reached', default=False, action='store_true')
     p.add_argument('--print_', help='print sequences throughout optimization', default=False, action='store_true')
     p.add_argument('--greedy', help='greedy search', default=False, action='store_true')
     p.add_argument('--add_rcs', help='introduce reverse complement of input oligos', default=False, action='store_true')
@@ -198,9 +199,9 @@ def main():
     
     # find solutions
     if args.time:
-        [solutions, scores] = optimize_timed(designer, args.niter, args.ncool, args.time, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_timed(designer, args.niter, args.ncool, args.time, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc, continue_=args.cont)
     else:
-        [solutions, scores] = optimize_n(designer, args.niter, args.ncool, args.nsol, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc)
+        [solutions, scores] = optimize_n(designer, args.niter, args.ncool, args.nsol, fout=fout, greedy=args.greedy, start_oligo_conc=args.conc, continue_=args.cont)
 
 if __name__ == '__main__':
     #unittest.main()
