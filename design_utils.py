@@ -104,25 +104,17 @@ class bpScorer():
             self.indices.append([pair_list, unpair_list])
 
     def score(self, seq):
-        dotplots = seq.bpps
         score = []
-        for i, dotplot in enumerate(dotplots):
+        for i, bpp in enumerate(seq.bpps):
             n = self.n[i]
             pair_list, unpair_list = self.indices[i]
             for item in pair_list:
                 if isinstance(item, list):
-                    values = [pair[2] for pair in dotplot if set(pair[0:2]) == set(item[0:2])]
-                    if len(values) != 0:
-                        score.append(sum(values))
+                    score.append(bpp[item[0], item[1]])
                 else:
-                    values = [pair[2] for pair in dotplot if (item in pair and n not in pair)]
-                    if len(values) != 0:
-                        score.append(sum(values))
+                    score.append(1-bpp[item,:].sum()-bpp[:,item].sum()+bpp[item,item])
             for item in unpair_list:
-                values = [pair[2] for pair in dotplot if set(pair[0:2]) == set(item[0:2])]
-                if len(values) != 0:
-                    score.append(-sum(values))
-        print score
+                score.append(-bpp[item[0], item[1]])
         return sum(score)
             
 def get_bpp_scoring_func(targets, nupack): 

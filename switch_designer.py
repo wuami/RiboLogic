@@ -55,20 +55,17 @@ class Design(object):
         fold_sequences = []
         for target in self.targets:
             if target['type'] == 'oligos':
-                fold_sequences.append('&'.join([self.inputs[x]['sequence'] for x in sorted(target['inputs']) if self.inputs[x]['type'] == 'RNA' ] + [sequence]))
+                fold_sequences.append('&'.join([self.inputs[x]['sequence'] for x in target['inputs'] if self.inputs[x]['type'] == 'RNA' ] + [sequence]))
             else:
                 fold_sequences.append(sequence)
         return fold_sequences
     
     def get_default_mode(self):
-        aptamer = False
         if any([target['type'] == 'aptamer' for target in self.targets]):
-            aptamer = True
-        multi_oligos = False
-        if any([len(target['inputs']) > 1 for target in self.targets if 'inputs' in target]):
-            multi_oligos = True
-        if multi_oligos:
-            print 'Switching to NUPACK to handle multiple RNA inputs'
+            print 'Using Vienna to handle ligand-binding'
+            self.default_mode = 'vienna'
+        elif any([len(target['inputs']) > 1 for target in self.targets if 'inputs' in target]):
+            print 'Using NUPACK to handle multiple RNA inputs'
             self.default_mode = 'nupack'
         else:
             self.default_mode = False
@@ -109,7 +106,7 @@ class DesignSequence(object):
         returns:
         sum of bp distances with and without the oligo 
         """
-       # test for secondary structure matches
+        # test for secondary structure matches
         energy_compare = {}
         distance = 0.0
         strands_interacting = 0.0
@@ -169,16 +166,9 @@ class DesignSequence(object):
                     concentrations = [target['inputs'][input]*oligo_conc for input in sorted(target['inputs'])]
                 else:
                     concentrations = 1
-                if target['type'] == 'aptamer':
-                    ligand = self.design.inputs[target['inputs'].keys()[0]]
-                    result[i] = p.apply_async(fold_utils.nupack_fold,
-                                              args=(self.fold_sequences[i],
-                                                    ligand['fold_constraint'],
-                                                    concentrations, True))
-                else:
-                    result[i] = p.apply_async(fold_utils.nupack_fold,
-                                              args=(self.fold_sequences[i], False,
-                                                    concentrations, True))
+                result[i] = p.apply_async(fold_utils.nupack_fold,
+                                          args=(self.fold_sequences[i],
+                                                concentrations, True))
         if self.mode == 'nupack':
             p.close()
             p.join()
@@ -330,7 +320,7 @@ class SwitchDesigner(object):
 
             # decrease temperature
             wait = 0
-            interval = n_iterations/(2*n_cool)
+            interval = max(n_iterations/(2*n_cool), 1)
             if i % interval == 0 and i >= interval*wait and i < interval*(n_cool+wait):
                 T -= 0.1
                 if T < 1:

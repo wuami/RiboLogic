@@ -1,5 +1,7 @@
 import subprocess, os, sys, settings
 import re, string, random, itertools
+import numpy as np
+import warnings
 
 paramfile = 'rna'
 
@@ -23,9 +25,9 @@ def vienna_fold(sequence, constraint=False, bpp=False, version=settings.vienna_v
     else:
         print 'Vienna version must be 1.8.5 or 2.1.9'
         sys.exit()
-    filename = '%s/%s' % (settings.BASE_DIR, ''.join(random.sample(string.lowercase,5)))
+    filename = '%s/%s' % (settings.TEMP_DIR, ''.join(random.sample(string.lowercase,5)))
     with open('%s.fa' % filename, 'w') as f:
-        f.write('>%s\n' % filename)
+        f.write('>%s\n' % os.path.basename(filename))
         f.write('%s\n' % sequence)
         if constraint:
             options = ' -C'
@@ -52,22 +54,22 @@ def vienna_fold(sequence, constraint=False, bpp=False, version=settings.vienna_v
     toks = re.search('([AUGC]+)\s*([\.\)\(&]+)\s+\(\s*([-0-9\.]+)\s*\)', output)
 
     if bpp:
+        bpp_matrix = np.zeros((len(sequence), len(sequence)))
         # get info from output file
-        try:
-            with open('%s_dp.ps' % filename) as f:
+        psfile = '%s_dp.ps' % os.path.basename(filename)
+        if os.path.isfile(psfile):
+            with open(psfile) as f:
                 ps = f.read()
-        except IOError:
-            print 'Can\'t find %s_dp.ps!' % filename
-            sys.exit()
 
-
-        # create bpp matrix from file
-        lines = re.findall('(\d+)\s+(\d+)\s+(\d*\.*\d*)\s+ubox',ps)
-        bpp_matrix = []
-        for ii in range(0,len(lines)):
-            bpp_matrix.append([int(lines[ii][0]) - 1, int(lines[ii][1]) - 1, float(lines[ii][2])])
+            # create bpp matrix from file
+            lines = re.findall('(\d+)\s+(\d+)\s+(\d*\.*\d*)\s+ubox',ps)
+            for ii in range(0,len(lines)):
+                bpp_matrix[int(lines[ii][0])-1, int(lines[ii][1])-1] = float(lines[ii][2])
+        else:
+            warnings.warn('dotplot file %s_dp.ps not found' % filename)
         os.system('rm %s*' % filename)
-        return [toks.group(2), float(toks.group(3)), bpp_matrix]
+        os.system('rm %s*' % os.path.basename(filename))
+        return [toks.group(2), float(toks.group(3)), np.array(bpp_matrix)]
     
     os.system('rm %s*' % filename)
     return [toks.group(2), float(toks.group(3))]
@@ -88,16 +90,16 @@ def get_orderings(n):
                 all.append(order_list)
     return all
 
-def nupack_fold(seq, constraint=False, oligo_conc=1, bpp=False):
+def nupack_fold(seq, oligo_conc=1, bpp=False):
     """
     finds most prevalent structure using nupack partition function
     """
     if '&' in seq:
-        return nupack_fold_multi(seq, constraint, oligo_conc, bpp)
+        return nupack_fold_multi(seq, oligo_conc, bpp)
     else:
-        return nupack_fold_single(seq, constraint, bpp)
+        return nupack_fold_single(seq, bpp)
 
-def nupack_fold_single(seq, constraint=False, bpp=False):
+def nupack_fold_single(seq, bpp=False):
     """
     finds most prevalent structure using nupack partition function for single strand
     """
@@ -106,14 +108,12 @@ def nupack_fold_single(seq, constraint=False, bpp=False):
     options = ['-material', paramfile]
     with open('%s.in' % filename, 'w') as f:
         f.write('%s\n' % seq)
-        if constraint:
-            f.write('%s\n' % constraint)
-            options.append('-constraint')
-    p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'mfe_mod')] + options + [filename], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'mfe')] + options + [filename], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
+        print stdout
         print stderr
-        raise ValueError('mfe_mod command failed for %s' % rand_string)
+        raise ValueError('mfe command failed for %s' % rand_string)
     result = ['.'*len(seq), 0, [1]]
     with open('%s.mfe' % filename) as f:
         line = f.readline()
@@ -125,23 +125,24 @@ def nupack_fold_single(seq, constraint=False, bpp=False):
                 break
             line = f.readline()
     if bpp:
-        p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'pairs_mod')] + options + [filename], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+        p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'pairs')] + options + [filename], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
         stdout, stderr = p.communicate()
         bpp_matrix = []
         if p.returncode != 0:
+            print stdout
             print stderr
-            raise ValueError('mfe_mod command failed for %s' % rand_string)
+            raise ValueError('mfe command failed for %s' % rand_string)
         with open('%s.ppairs' % filename) as f:
             line = f.readline()
             while line:
                 if not line.startswith('%') and line.strip():
-                    bpp_matrix = nupack_read_bpp(f)
+                    bpp_matrix = nupack_read_bpp(f, len(seq))
                 line = f.readline()
         result.append(bpp_matrix)
     os.system('rm %s*' % filename)
     return result
 
-def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
+def nupack_fold_multi(seq, oligo_conc=1, bpp=False):
     """
     finds most prevalent structure using nupack partition function for multistrand
     """
@@ -150,20 +151,17 @@ def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
     split = seq.split('&')
     with open('%s.in' % filename, 'w') as f:
         f.write('%s\n' % len(split))
-        for seq in split:
-            f.write('%s\n' % seq)
+        for s in split:
+            f.write('%s\n' % s)
         f.write('1\n')
-        if constraint:
-            for i in range(len(split)-1):
-                print len(split[i])
-                f.write('%s\n' % ('.'*len(split[i])))
-            f.write(constraint)
     orderings = get_orderings(len(split))
     with open('%s.list' % filename, 'w') as f:
         for ordering in orderings:
             f.write('%s\n' % ' '.join([str(x) for x in ordering]))
     with open('%s.con' % filename, 'w') as f:
         if isinstance(oligo_conc, list):
+            assert len(split) == len(oligo_conc) + 1, \
+                'length of concentrations must be one less than number of strands'
             f.write('%s\n' % '\n'.join([str(x) for x in oligo_conc]))
         else:
             f.write('%s\n' % oligo_conc * (len(split)-1))
@@ -171,16 +169,16 @@ def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
     options = ['-material', paramfile, '-ordered', '-mfe']#, '-quiet']
     if bpp:
         options.append('-pairs')
-    if constraint:
-        options.append('-constraint')
-    p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'complexes_mod')] + options + [filename], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'complexes')] + options + [filename], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
+        print stdout
         print stderr
-        raise ValueError('complexes_mod command failed for %s' % rand_string)
+        raise ValueError('complexes command failed for %s' % rand_string)
     p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'concentrations'), '-ordered', filename], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
+        print stdout
         print stderr
         raise ValueError('concentrations command failed for %s' % rand_string)
     # get mfe
@@ -189,7 +187,7 @@ def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
         for line in f_eq:
             if not line.startswith('%'):
                 complex = line.strip().split()
-                if int(complex[len(split)+1]):
+                if float(complex[len(split)+1]):
                     break
     if not complex:
         os.system('rm %s*' % filename)
@@ -225,7 +223,7 @@ def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
             line = f_pairs.readline()
             while line:
                 if line.startswith('%% complex%s' % complex[0]):
-                    bpp_matrix = nupack_read_bpp(f_pairs)
+                    bpp_matrix = nupack_read_bpp(f_pairs, len(seq))
                     break
                 line = f_pairs.readline()
         os.system('rm %s*' % filename)
@@ -234,17 +232,18 @@ def nupack_fold_multi(seq, constraint=False, oligo_conc=1, bpp=False):
     os.system('rm %s*' % filename)
     return [secstruct.replace('+', '&'), float(energy), strands]
 
-def nupack_read_bpp(file):
+def nupack_read_bpp(f, n):
     """
     read a base pair probability matrix from a nupack output file
     """
-    bpp_matrix = []
-    file.readline()
-    line = file.readline()
+    bpp_matrix = np.zeros((n,n))
+    f.readline()
+    line = f.readline()
     while line and not line.startswith('%'):
         bp = line.strip().split()
-        bpp_matrix.append([int(bp[0])-1, int(bp[1])-1, float(bp[2])])
-        line = file.readline()
+        if int(bp[1])-1 != n:
+            bpp_matrix[int(bp[0])-1, int(bp[1])-1] = float(bp[2])
+        line = f.readline()
     return bpp_matrix
 
 

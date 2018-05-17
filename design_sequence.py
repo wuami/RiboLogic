@@ -8,6 +8,7 @@ import settings
 import varna
 import copy
 import signal
+from collections import OrderedDict
 
 def insert_in_string(str, substr, i):
     return str[0:i] + substr + str[i+len(substr):]
@@ -56,7 +57,7 @@ def read_design_from_file(filename, **kwargs):
                 target = {}
                 target['type'] = line.strip('>\n')
                 if target['type'] != 'single':
-                    target['inputs'] = {}
+                    target['inputs'] = OrderedDict()
                     line = f.readline()
                     if not line.strip() == "":
                         for input in line.split(';'):
