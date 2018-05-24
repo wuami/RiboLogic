@@ -64,5 +64,7 @@ target/
 *.cx
 *.json
 *.out
-*.sh.*
+*.sh*
+*.swo
 *.swp
+tmp/

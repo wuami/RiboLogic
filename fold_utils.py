@@ -5,7 +5,7 @@ import warnings
 
 paramfile = 'rna'
 
-def vienna_fold(sequence, constraint=False, bpp=False, version=settings.vienna_version):
+def vienna_fold(sequence, constraint=False, bpp=False):
     """
     folds sequence using Vienna
 
@@ -15,16 +15,6 @@ def vienna_fold(sequence, constraint=False, bpp=False, version=settings.vienna_v
     returns:
     secondary structure
     """
-    if version in ['1.8.5', '1.8', '1']:
-        if settings.os_ == 'osx':
-            print 'Vienna version 1.8.5 not supported on OSX'
-            sys.exit()
-        version = '1'
-    elif version in ['2.1.9', '2.1', '2']:
-        version = '2'
-    else:
-        print 'Vienna version must be 1.8.5 or 2.1.9'
-        sys.exit()
     filename = '%s/%s' % (settings.TEMP_DIR, ''.join(random.sample(string.lowercase,5)))
     with open('%s.fa' % filename, 'w') as f:
         f.write('>%s\n' % os.path.basename(filename))
@@ -45,9 +35,9 @@ def vienna_fold(sequence, constraint=False, bpp=False, version=settings.vienna_v
         if sequence.count('&') > 1:
             print 'Cannot handle more than 2 strands with Vienna - try the nupack option'
             sys.exit()
-        command = 'RNAcofold' + version
+        command = 'RNAcofold'
     else:
-        command = 'RNAfold' + version
+        command = 'RNAfold'
     output = subprocess.check_output(os.path.join(settings.VIENNA_DIR,command) + options + ' -T 37.0 < %s' % filename + '.fa', shell=True)
 
     # parse the result

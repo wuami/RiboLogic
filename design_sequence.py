@@ -1,107 +1,8 @@
 import switch_designer
-import sys, os
-import json, re
-import random
+import os
+import re
 import argparse
-import requests
-import settings
-import varna
-import copy
 import signal
-from collections import OrderedDict
-
-def insert_in_string(str, substr, i):
-    return str[0:i] + substr + str[i+len(substr):]
-
-def read_design_from_file(filename, **kwargs):
-    """
-    reads design information from text file
-    """
-    inputs = {}
-    targets = []
-    beginseq = None
-    seq_locks = None
-    constraints = None
-    substr = []
-    variables = {}
-    
-    with open(filename) as f:
-        line = f.readline()
-        while line:
-            # read inputs
-            if line.startswith('<'):
-                input = f.readline().strip()
-                try:
-                    inputs[line.strip('<\n')] = {'type':'ligand', 'kD': float(input), 'fold_constraint': f.readline().strip()}
-                except:
-                    inputs[line.strip('<\n')] = {'type':'RNA', 'sequence':input}
-            # read sequence constraints
-            elif line.startswith('-sequence'):
-                seq = f.readline().strip()
-                beginseq = seq.replace('N', 'A')
-                seq_locks = ''.join(['o' if c == 'N' else 'x' for c in seq])
-                free_positions = [i for i,x in enumerate(seq_locks) if x == 'o']
-            # read variable element
-            elif line.startswith('-variable'):
-                if not beginseq:
-                    print 'Must specify sequence before variable element'
-                    sys.exit()
-                seq = f.readline().strip()
-                locations = [m.start() for m in re.finditer('(?=%s)' % 'o'*len(seq), seq_locks)]
-                variables[seq] = locations
-            # read objectives
-            elif line.startswith('>'):
-                if not beginseq:
-                    print 'Must specify sequence before objectives'
-                    sys.exit()
-                target = {}
-                target['type'] = line.strip('>\n')
-                if target['type'] != 'single':
-                    target['inputs'] = OrderedDict()
-                    line = f.readline()
-                    if not line.strip() == "":
-                        for input in line.split(';'):
-                            spl = input.split()
-                            if len(spl) > 1:
-                                target['inputs'][spl[0]] = float(spl[1])
-                            else:
-                                target['inputs'][spl[0]] = 1
-                target['secstruct'] = f.readline().strip()
-                target['constrained'] = f.readline().strip()
-                free_positions = [i for i,x in enumerate(target['constrained']) if x == 'o' and i in free_positions]
-                if variables:
-                    target['variables'] = {}
-                    for variable in variables:
-                        target['variables'][variable] = {'secstruct': f.readline().strip(),
-                                                         'constrained': f.readline().strip()}
-                line = f.readline()
-                if not line.strip() == "":
-                    thresholds = [int(x) for x in line.split()]
-                    target['threshold'] = []
-                    r = re.compile("[up]+[ox]")
-                    for i,substruct in enumerate(r.finditer(target['constrained'])):
-                        target['threshold'].append([substruct.start(), 
-                                                    substruct.start() + len(substruct.group()) - 1,
-                                                    int(thresholds[i])])
-                targets.append(target)
-            elif line.startswith('x'):
-                substr.append(line.strip('x\n'))
-            line = f.readline()
-
-    free_positions = set(free_positions)
-    for seq, pos in variables.items():
-        l = len(seq)
-        positions = [p for p in pos if set(range(p,p+l)).issubset(free_positions)]
-        if 'rpos' in kwargs:
-            r = kwargs['rpos']
-        else:
-            r = random.choice(positions)
-        beginseq = insert_in_string(beginseq, seq, r)
-        seq_locks = insert_in_string(seq_locks, 'x'*l, r)
-        for target in targets:
-            target['secstruct'] = insert_in_string(target['secstruct'], target['variables'][seq]['secstruct'], r)
-            target['constrained'] = insert_in_string(target['constrained'], target['variables'][seq]['constrained'], r)
-    return switch_designer.Design(beginseq, seq_locks, targets, inputs, substrings=substr)
 
 def optimize_n(design, niter, ncool, n, **kwargs):
     # run design n times
@@ -189,7 +90,7 @@ def main():
     args = p.parse_args()
 
     # read design
-    design = read_design_from_file(args.filename)
+    design = switch_designer.read_design_from_file(args.filename)
     if design.default_mode:
         args.mode = design.default_mode
     designer =  switch_designer.SwitchDesigner(os.path.basename(args.filename).split('.')[0], design, **vars(args))

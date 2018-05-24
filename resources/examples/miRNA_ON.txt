@@ -1,0 +1,14 @@
+<miRNA
+AUAAGACGAGCAAAAAGCUUGU
+
+-sequence
+NNNNNNNNNNNNNNNNNNNNNNNNNNNNNACAUGAGGAUCACCCAUGUNNNNNNNNNNNNNNNNNNNNNNNNNNNNN
+
+>single
+.............................(((((.((....))))))).............................
+ooooooooooooooooooooooooooooonnnnnnnnnnnnnnnnnnnooooooooooooooooooooooooooooo
+
+>oligos
+miRNA 1e-7
+......................&.............................(((((.((....))))))).............................
+ooooooooooooooooooooooooooooooooooooooooooooooooooooxxxxxxxxxxxxxxxxxxxooooooooooooooooooooooooooooo
