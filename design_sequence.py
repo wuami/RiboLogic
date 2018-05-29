@@ -4,7 +4,7 @@ import re
 import argparse
 import signal
 
-def optimize_n(design, niter, ncool, n, **kwargs):
+def optimize_n(design, niter, ncool, n, maxattempts=1, **kwargs):
     # run design n times
     solutions = []
     scores = []
@@ -33,7 +33,7 @@ def optimize_n(design, niter, ncool, n, **kwargs):
             print 'best distance: %s' % design.best_design.bp_distance
             print 'final conc: %s' % design.oligo_conc
             attempts += 1
-            if attempts == 10:
+            if attempts == maxattempts:
                 break
         print '%s sequence(s) calculated' % i
     return [solutions, scores]

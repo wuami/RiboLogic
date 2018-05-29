@@ -243,19 +243,20 @@ class DesignSequence(object):
         self.fold_sequences = self.design.get_fold_sequences(sequence)
         self.bpps = []
         self.oligo_conc = oligo_conc
-        if self.mode == 'nupack':
-            result = [None] * self.n_targets
-            p = multiprocessing.Pool(self.n_targets)
+        result = [None] * self.n_targets
+        p = multiprocessing.Pool(self.n_targets)
         for i, target in enumerate(self.design.targets):
             if self.mode == 'vienna':
                 if target['type'] == 'aptamer':
                     ligand = self.design.inputs[target['inputs'].keys()[0]]
-                    fold_list = fold_utils.vienna_fold(self.fold_sequences[i], ligand['fold_constraint'], bpp=True)
+                    result[i] = p.apply_async(fold_utils.vienna_fold,
+                                              args=(self.fold_sequences[i],
+                                                    ligand['fold_constraint'],
+                                                    True))
                 else:
-                    fold_list = fold_utils.vienna_fold(self.fold_sequences[i], bpp=True)
-                self.native.append(fold_list[0])
-                self.energies.append(fold_list[1])
-                self.bpps.append(fold_list[2])
+                    result[i] = p.apply_async(fold_utils.vienna_fold,
+                                              args=(self.fold_sequences[i],
+                                                    None, True))
             if self.mode == 'nupack':
                 if 'inputs' in target:
                     concentrations = [target['inputs'][input]*oligo_conc for input in sorted(target['inputs'])]
@@ -264,13 +265,12 @@ class DesignSequence(object):
                 result[i] = p.apply_async(fold_utils.nupack_fold,
                                           args=(self.fold_sequences[i],
                                                 concentrations, True))
-        if self.mode == 'nupack':
-            p.close()
-            p.join()
-            result = [x.get() for x in result]
-            self.native = [[x[0], x[2]] for x in result]
-            self.energies = [x[1] for x in result]
-            self.bpps = [x[3] for x in result]
+        p.close()
+        p.join()
+        result = [x.get() for x in result]
+        self.native = [[x[0], x[2]] if len(x) == 4 else x[0] for x in result]
+        self.energies = [x[1] for x in result]
+        self.bpps = [x[-1] for x in result]
         self.bp_distance = self.score_secstructs(sequence, self.native, self.energies)
         self.design_score = max(self.get_design_score(),0)
         return
@@ -346,7 +346,7 @@ class SwitchDesigner(object):
     def check_current(self):
         return self.best_design.is_solution()
 
-    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, print_ = None, start_oligo_conc=1e7, continue_=False):
+    def optimize_sequence(self, n_iterations, n_cool = 50, greedy = None, print_ = None, start_oligo_conc=1, continue_=False):
         """
         monte-carlo optimization of the sequence
 

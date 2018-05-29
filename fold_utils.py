@@ -5,12 +5,12 @@ import warnings
 
 paramfile = 'rna'
 
-def vienna_fold(sequence, constraint=False, bpp=False):
+def vienna_fold(sequence, constraint=None, bpp=False):
     """
     folds sequence using Vienna
 
     args:
-    seq is the sequence string
+    sequence is the sequence string
 
     returns:
     secondary structure
@@ -27,10 +27,7 @@ def vienna_fold(sequence, constraint=False, bpp=False):
     if bpp:
         options += ' -p'
     else:
-        if version == '1':
-            options += ' -noPS'
-        else:
-            options += ' --noPS'
+        options += ' --noPS'
     if '&' in sequence:
         if sequence.count('&') > 1:
             print 'Cannot handle more than 2 strands with Vienna - try the nupack option'
@@ -80,16 +77,16 @@ def get_orderings(n):
                 all.append(order_list)
     return all
 
-def nupack_fold(seq, oligo_conc=1, bpp=False):
+def nupack_fold(sequence, oligo_conc=1, bpp=False):
     """
     finds most prevalent structure using nupack partition function
     """
-    if '&' in seq:
-        return nupack_fold_multi(seq, oligo_conc, bpp)
+    if '&' in sequence:
+        return nupack_fold_multi(sequence, oligo_conc, bpp)
     else:
-        return nupack_fold_single(seq, bpp)
+        return nupack_fold_single(sequence, bpp)
 
-def nupack_fold_single(seq, bpp=False):
+def nupack_fold_single(sequence, bpp=False):
     """
     finds most prevalent structure using nupack partition function for single strand
     """
@@ -97,14 +94,14 @@ def nupack_fold_single(seq, bpp=False):
     filename = '%s/%s' % (settings.TEMP_DIR, rand_string)
     options = ['-material', paramfile]
     with open('%s.in' % filename, 'w') as f:
-        f.write('%s\n' % seq)
+        f.write('%s\n' % sequence)
     p = subprocess.Popen([os.path.join(settings.NUPACK_DIR,'mfe')] + options + [filename], stdout=subprocess.PIPE, stdin=subprocess.PIPE, stderr=subprocess.PIPE)
     stdout, stderr = p.communicate()
     if p.returncode != 0:
         print stdout
         print stderr
         raise ValueError('mfe command failed for %s' % rand_string)
-    result = ['.'*len(seq), 0, [1]]
+    result = ['.'*len(sequence), 0, [1]]
     with open('%s.mfe' % filename) as f:
         line = f.readline()
         while line:
@@ -126,19 +123,19 @@ def nupack_fold_single(seq, bpp=False):
             line = f.readline()
             while line:
                 if not line.startswith('%') and line.strip():
-                    bpp_matrix = nupack_read_bpp(f, len(seq))
+                    bpp_matrix = nupack_read_bpp(f, len(sequence))
                 line = f.readline()
         result.append(bpp_matrix)
     os.system('rm %s*' % filename)
     return result
 
-def nupack_fold_multi(seq, oligo_conc=1, bpp=False):
+def nupack_fold_multi(sequence, oligo_conc=1, bpp=False):
     """
     finds most prevalent structure using nupack partition function for multistrand
     """
     rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
     filename = '%s/%s' % (settings.TEMP_DIR, rand_string)
-    split = seq.split('&')
+    split = sequence.split('&')
     with open('%s.in' % filename, 'w') as f:
         f.write('%s\n' % len(split))
         for s in split:
@@ -182,8 +179,8 @@ def nupack_fold_multi(seq, oligo_conc=1, bpp=False):
     if not complex:
         os.system('rm %s*' % filename)
         if bpp:
-            return ['.'*len(seq), 0, range(1,len(split)+1), []]
-        return ['.'*len(seq), 0, range(1,len(split)+1)]
+            return ['.'*len(sequence), 0, range(1,len(split)+1), []]
+        return ['.'*len(sequence), 0, range(1,len(split)+1)]
     # get strand ordering
     with open('%s.ocx-key' % filename) as f_key:
         for line in f_key:
@@ -213,7 +210,7 @@ def nupack_fold_multi(seq, oligo_conc=1, bpp=False):
             line = f_pairs.readline()
             while line:
                 if line.startswith('%% complex%s' % complex[0]):
-                    bpp_matrix = nupack_read_bpp(f_pairs, len(seq))
+                    bpp_matrix = nupack_read_bpp(f_pairs, len(sequence))
                     break
                 line = f_pairs.readline()
         os.system('rm %s*' % filename)
@@ -237,22 +234,22 @@ def nupack_read_bpp(f, n):
     return bpp_matrix
 
 
-def nupack_energy(seq, secstruct):
+def nupack_energy(sequence, secstruct):
     rand_string = ''.join(random.choice(string.ascii_lowercase) for _ in range(6))
     filename = '%s/%s' % (settings.TEMP_DIR, rand_string)
-    multi = '&' in seq
-    split = seq.split('&')
+    multi = '&' in sequence
+    split = sequence.split('&')
     with open('%s.in' % filename, 'w') as f:
         if multi:
             f.write('%s\n' % len(split))
-        for seq in split:
-            f.write('%s\n' % seq)
+        for sequence in split:
+            f.write('%s\n' % sequence)
         if multi:
             f.write('%s\n' % ' '.join([str(i) for i in secstruct[1]]))
             f.write(secstruct[0].replace('&', '+'))
         else:
             f.write(secstruct.replace('&', '+'))
-    if '&' in seq:
+    if '&' in sequence:
         options = ['multi']
     else:
         options = []
