@@ -3,6 +3,7 @@ import os
 import re
 import argparse
 import signal
+import multiprocessing as mp
 
 def optimize_n(design, niter, ncool, n, maxattempts=1, **kwargs):
     # run design n times
@@ -98,6 +99,7 @@ def main():
         fout = os.path.join(os.path.splitext(args.filename)[0] + '_' + designer.mode + '.out')
     else:
         fout = False
+    print 'Designing using %d cores' % mp.cpu_count()
     
     # find solutions
     if args.time:

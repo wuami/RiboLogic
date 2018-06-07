@@ -112,7 +112,7 @@ class bpScorer():
                 if isinstance(item, list):
                     score.append(bpp[item[0], item[1]])
                 else:
-                    score.append(1-bpp[item,:].sum()-bpp[:,item].sum()+bpp[item,item])
+                    score.append(bpp[item,:].sum()+bpp[:,item].sum()-bpp[item,item])
             for item in unpair_list:
                 score.append(-bpp[item[0], item[1]])
         return sum(score)
