@@ -7,9 +7,11 @@ import sys
 import multiprocessing
 from collections import OrderedDict
 import re
+import copy
 
 def insert_in_string(str, substr, i):
     return str[0:i] + substr + str[i+len(substr):]
+
 
 def read_design_from_file(filename, **kwargs):
     """
@@ -21,7 +23,7 @@ def read_design_from_file(filename, **kwargs):
     seq_locks = None
     constraints = None
     substr = []
-    variables = {}
+    variables = OrderedDict()
     
     with open(filename) as f:
         line = f.readline()
@@ -86,20 +88,25 @@ def read_design_from_file(filename, **kwargs):
                 substr.append(line.strip('x\n'))
             line = f.readline()
 
-    free_positions = set(free_positions)
-    for seq, pos in variables.items():
-        l = len(seq)
-        positions = [p for p in pos if set(range(p,p+l)).issubset(free_positions)]
-        if 'rpos' in kwargs:
-            r = kwargs['rpos']
-        else:
-            r = random.choice(positions)
-        beginseq = insert_in_string(beginseq, seq, r)
-        seq_locks = insert_in_string(seq_locks, 'x'*l, r)
-        for target in targets:
-            target['secstruct'] = insert_in_string(target['secstruct'], target['variables'][seq]['secstruct'], r)
-            target['constrained'] = insert_in_string(target['constrained'], target['variables'][seq]['constrained'], r)
-    return Design(beginseq, seq_locks, targets, inputs, substrings=substr)
+    done = False
+    while not done:
+        new_targets = copy.deepcopy(targets)
+        new_free_positions = set(free_positions)
+        for seq, pos in variables.items():
+            l = len(seq)
+            positions = [p for p in pos if set(range(p,p+l)).issubset(free_positions)]
+            if 'rpos' in kwargs:
+                r = kwargs['rpos']
+            else:
+                r = random.choice(positions)
+            beginseq = insert_in_string(beginseq, seq, r)
+            seq_locks = insert_in_string(seq_locks, 'x'*l, r)
+            for target in new_targets:
+                target['secstruct'] = insert_in_string(target['secstruct'], target['variables'][seq]['secstruct'], r)
+                target['constrained'] = insert_in_string(target['constrained'], target['variables'][seq]['constrained'], r)
+                new_free_positions = [i for i,x in enumerate(target['constrained']) if x == 'o' and i in new_free_positions]
+        done = all([design_utils.check_valid_insertion(targets[i]['secstruct'], target['secstruct']) for i, target in enumerate(new_targets)])
+    return Design(beginseq, seq_locks, new_targets, inputs, substrings=substr)
 
 class Design(object):
     

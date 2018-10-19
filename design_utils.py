@@ -131,6 +131,35 @@ def get_dotplot(sequence, nupack=False, constraint=False):
     else:
         return fold_utils.vienna_fold(sequence, bpp=True)
 
+def is_valid_secstruct(secstruct):
+    """ determine if secstruct string is valid """
+    pairs = []
+    for i in range(len(secstruct)):
+        if secstruct[i] == '(':
+            pairs.append(i)
+        elif secstruct[i] == ')':
+            if not pairs:
+                return False
+            else:
+                pairs.pop()
+    return len(pairs) == 0
+
+def check_valid_insertion(secstruct1, secstruct2):
+    """ determine if secstruct2 has valid secstruct insertions into secstruct 1
+    
+    Ensures all pairs from secstruct 1 are in secstruct 2 and that secstruct 2
+    is a valid dot bracket notation
+    """
+    if not is_valid_secstruct(secstruct2):
+        return False
+    pairmap1 = get_pairmap_from_secstruct(secstruct1)
+    pairmap2 = get_pairmap_from_secstruct(secstruct2)
+    for i in range(len(pairmap1)):
+        if pairmap1[i] != -1 and pairmap1[i] > i:
+            if pairmap2[i] != pairmap1[i]:
+               return False
+    return True
+
 def get_pairmap_from_secstruct(secstruct):
     """
     generates dictionary containing pair mappings
@@ -182,7 +211,7 @@ def get_pairmap_from_secstruct(secstruct):
             pairs_array[pair_stack[ii]] = end_stack[-ii]
             pairs_array[end_stack[-ii]] = pair_stack[ii]
     else:
-         print 'ERROR: pairing incorrect %s' % secstruct
+         raise ValueError('ERROR: pairing incorrect %s' % secstruct)
 
     # adjust pairs array for strand ordering
     if order:
@@ -273,3 +302,5 @@ def weighted_choice(seq, w):
         if current + w[i] >= r:
             return choice
         current += w[i]
+
+

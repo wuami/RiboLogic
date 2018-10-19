@@ -16,6 +16,7 @@ class SequenceGraph(object):
         """
 
         # set class variables
+        self.design = design
         self.inputs = {key: value for key, value in design.inputs.items() if value['type'] == 'RNA'}
         self.targets = design.targets
         self.seq_locks = self._get_full_seqlocks(design.seq_locks)
@@ -36,6 +37,7 @@ class SequenceGraph(object):
         #print self.dep_graph.nodes(data=True)
 
         # update sequence
+        print self.design_seq
         self.reset_sequence(self.design_seq)
 
         # draw if option specified
@@ -58,10 +60,15 @@ class SequenceGraph(object):
         """
         self.sequence = self._get_full_sequence(sequence)
         seq_array = list(self.sequence)
-        if self.autocomplement:
-            for i in range(self.N):
-                #if self.seq_locks[i] == 'x':
-                self.update_neighbors(i, seq_array, [])
+        try:
+            if self.autocomplement:
+                for i in range(self.N):
+                    #if self.seq_locks[i] == 'x':
+                    self.update_neighbors(i, seq_array, [])
+        except ValueError as e:
+            print(e)
+            self.design.print_info()
+            raise ValueError('Sequence invalid at position %d: %s' % (i, sequence))
         self.sequence = ''.join(seq_array)
         if self.add_rcs:
             self.init_oligo_rcs()
