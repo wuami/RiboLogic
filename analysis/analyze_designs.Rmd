@@ -1,0 +1,70 @@
+---
+title: "RiboLogic design analysis"
+author: "Michelle Wu"
+date: "3/27/2019"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(ape)
+```
+
+To generate the distance matrix file for clustering sequences, run
+
+```
+python compute_distance_matrix all_RiboLogic_190327.txt sequence
+```
+
+Read in both the full dataset and the distance matrix.
+
+```{r read_data}
+filename = 'all_RiboLogic_190327'
+ribologic_designs = read_tsv(paste0(filename, '.txt'))
+distance_matrix = read_tsv(paste0(filename, '.sequence.dist'), col_names = F)
+```
+
+```{r helper_functions}
+# maps numeric values to colors
+numeric2color = function(var, colors, minvalue = NULL, maxvalue = NULL) {
+  ramp = colorRamp(colors)
+  finitevalues = var[is.finite(var)]
+  if(is.null(min))
+    minvalue = min(finitevalues)
+  if(is.null(max))
+    maxvalue = max(finitevalues)
+  var = (var - minvalue) / (maxvalue - minvalue)
+  return(apply(ramp(var), 1, rgb2str))
+}
+```
+
+## Sequence analysis
+
+Cluster sequences using distance matrix
+
+```{r sequence_clustering}
+n = dim(distance_matrix)[1]
+hc = hclust(as.dist(distance_matrix))
+phy = as.phylo(hc)
+
+max_fc = max(abs(log(ribologic_designs$activation_ratio)))
+fc_color = numeric2color(log(ribologic_designs$activation_ratio),
+                         colors = c('#FF0000', '#888888', '#00FF00'),
+                         minvalue = -max_fc, maxvalue = max_fc)
+
+plot(phy, 'fan', edge.color=apply(phy$edge, 1, function(pair) ifelse(pair[2] > n, '#000000', fc_color[pair[2]])),
+     show.tip.label = F)
+```
+
+## Statistical comparisons
+
+```{r statistical_tests}
+# Perform a Wilcoxon rank sum test comparing activation ratios by puzzle
+ribologic_designs %>% group_by(puzzle) %>% 
+  summarize_at('activation_ratio', funs(p=wilcox.test(., alternative='greater', mu = 1)$p.value))
+
+# Calculate summary statistics
+ribologic_designs %>% group_by(puzzle) %>%
+  summarize_at('activation_ratio', funs(median=median, max=max, count=length))
+```
